@@ -59,7 +59,7 @@ struct HoldingsView: View {
             Button {
                 showManualAdd = true
             } label: {
-                Label(L10n.l("holdings.add"), systemImage: "plus.circle")
+                Label(L10n.l("holdings.add"), systemImage: "plus")
             }
             .buttonStyle(.borderedProminent)
             .help(L10n.l("holdings.add"))
