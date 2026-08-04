@@ -44,21 +44,27 @@ struct TransactionsView: View {
                     }
                 }
                 .safeAreaInset(edge: .bottom) {
-                    if let tx = selected {
-                        TradeSummaryBar(tx: tx)
+                    VStack(spacing: 8) {
+                        if let tx = selected {
+                            TradeSummaryBar(tx: tx)
+                        }
+                        // 底部添加交易入口（右上角工具栏不占位）
+                        HStack {
+                            Button {
+                                editing = nil
+                                showEditor = true
+                            } label: {
+                                Label(L10n.l("tx.add"), systemImage: "plus")
+                            }
+                            .buttonStyle(.bordered)
+                            .help(L10n.l("tx.add"))
+                            Spacer()
+                        }
                     }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.bar)
                 }
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    editing = nil
-                    showEditor = true
-                } label: {
-                    Label(L10n.l("tx.add"), systemImage: "plus")
-                }
-                .help(L10n.l("tx.add"))
             }
         }
         .sheet(isPresented: $showEditor) {

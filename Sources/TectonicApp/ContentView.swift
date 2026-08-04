@@ -64,10 +64,8 @@ struct ContentView: View {
                     }
                     .help("刷新行情 (⌘R)")
                 }
-                // 添加标的按钮仅在自选/行情页显示（避免其他页面右上角出现多余的 +）
-                if app.selectedTab == .watchlist || app.selectedTab == .markets {
-                    AddSymbolButton()
-                }
+                // 添加标的按钮（全局：自选/行情页使用）
+                AddSymbolButton()
             }
         }
         .onAppear {
