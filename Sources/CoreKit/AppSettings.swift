@@ -59,12 +59,12 @@ public final class AppSettings: ObservableObject {
     }
 
     /// 移动某市场到新位置（支持拖拽 onMove 与上下按钮）
+    /// SwiftUI onMove 的 destination 是「移除 source 后的插入位置」，直接插入即可
     public func moveMarket(from source: IndexSet, to destination: Int) {
         guard let fromIdx = source.first, fromIdx < marketOrder.count else { return }
         var order = marketOrder
         let item = order.remove(at: fromIdx)
-        let toIdx = destination > fromIdx ? destination - 1 : destination
-        order.insert(item, at: min(max(toIdx, 0), order.count))
+        order.insert(item, at: min(max(destination, 0), order.count))
         marketOrder = order
     }
 
