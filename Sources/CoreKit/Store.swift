@@ -227,11 +227,14 @@ public final class Store: ObservableObject {
         return added
     }
 
-    /// 首启导入预置订阅源（幂等，按 url+kind 查重）
+    /// 启动时导入/补全预置订阅源（幂等：每次检查缺失项自动补全，保证新增预置源生效）
     @discardableResult
     public func importBuiltinFeedsIfNeeded() throws -> Int {
         let d = UserDefaults.standard
-        guard !d.bool(forKey: NewsFeedCatalog.importedFlagKey) else { return 0 }
+        if d.bool(forKey: NewsFeedCatalog.importedFlagKey) {
+            // 老用户：仍检查补全（新预置源自动加入）
+            return try importMissingBuiltinFeeds()
+        }
         let added = try importMissingBuiltinFeeds()
         d.set(true, forKey: NewsFeedCatalog.importedFlagKey)
         return added
@@ -267,19 +270,34 @@ public final class Store: ObservableObject {
         try reloadFeeds()
     }
 
-    /// 拉取某分类下所有启用源的资讯（合并按时间排序）
+    /// 拉取某分类下所有启用源的资讯（分批并发，每批 3 个源，避免单一域名被反爬限流）
     public func fetchNews(category: NewsFeedCategory) async -> [NewsItem] {
         let feeds = newsFeeds.filter { $0.category == category && $0.enabled }
         guard !feeds.isEmpty else { return [] }
         var all: [NewsItem] = []
-        await withTaskGroup(of: [NewsItem].self) { group in
-            for feed in feeds {
-                group.addTask {
-                    (try? await NewsSourceRegistry.fetch(feed: feed, limit: 20)) ?? []
+        let batchSize = 3
+        var index = 0
+        while index < feeds.count {
+            let batch = Array(feeds[index..<min(index + batchSize, feeds.count)])
+            index += batchSize
+            await withTaskGroup(of: (String, [NewsItem]).self) { group in
+                for feed in batch {
+                    group.addTask {
+                        do {
+                            let items = try await NewsSourceRegistry.fetch(feed: feed, limit: 20)
+                            return (feed.name, items)
+                        } catch {
+                            print("Tectonic: 资讯源 [\(feed.name)] 拉取失败: \(error.localizedDescription)")
+                            return (feed.name, [])
+                        }
+                    }
                 }
-            }
-            for await items in group {
-                all.append(contentsOf: items)
+                for await (name, items) in group {
+                    if items.isEmpty {
+                        print("Tectonic: 资讯源 [\(name)] 返回空")
+                    }
+                    all.append(contentsOf: items)
+                }
             }
         }
         // 去重（按 id）+ 时间倒序

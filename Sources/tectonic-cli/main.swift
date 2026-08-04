@@ -127,6 +127,18 @@ struct TectonicCLI {
                 let db = try AppDatabase.makeDefault()
                 let store = Store(db: db)
                 try store.importBuiltinFeedsIfNeeded()
+                // 调试模式：逐源拉取打印结果
+                if args.contains("--debug") {
+                    for feed in store.newsFeeds.filter({ $0.category == cat && $0.enabled }) {
+                        do {
+                            let n = try await NewsSourceRegistry.fetch(feed: feed, limit: 5).count
+                            print("[\(feed.name)] → \(n) 条 ✅")
+                        } catch {
+                            print("[\(feed.name)] → ❌ \(error.localizedDescription)")
+                        }
+                    }
+                    exit(0)
+                }
                 let items = await store.fetchNews(category: cat)
                 print("\(cat.displayName) 共 \(items.count) 条")
                 for item in items.prefix(10) {

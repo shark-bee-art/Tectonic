@@ -29,9 +29,22 @@ struct ContentView: View {
                 HoldingsView()
             }
         } detail: {
-            if let symbol = app.selectedSymbol {
-                QuoteDetailView(symbol: symbol)
-            } else {
+            switch app.selectedTab {
+            case .watchlist, .markets:
+                if let symbol = app.selectedSymbol {
+                    QuoteDetailView(symbol: symbol)
+                        .id(symbol.id)
+                } else {
+                    PlaceholderView()
+                }
+            case .newsFlash, .newsResearch, .newsEarnings, .newsCalendar:
+                if let item = app.selectedNews {
+                    NewsDetailView(item: item)
+                        .id(item.id)
+                } else {
+                    PlaceholderView()
+                }
+            case .holdings:
                 PlaceholderView()
             }
         }

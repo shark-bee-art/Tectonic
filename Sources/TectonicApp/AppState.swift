@@ -11,6 +11,7 @@ final class AppState: ObservableObject {
 
     // 导航
     @Published var selectedSymbol: Symbol?
+    @Published var selectedNews: NewsItem?
     @Published var selectedTab: SidebarItem = .watchlist
 
     @Published var isRefreshing = false

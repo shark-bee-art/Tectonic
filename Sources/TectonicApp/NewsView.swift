@@ -1,20 +1,30 @@
 import SwiftUI
 import CoreKit
 
-/// 资讯分类列表：快讯/研报/财报/日历 通用
+/// 资讯分类列表：快讯/研报/财报/日历 通用；日历按日期分组
 struct NewsListView: View {
     @EnvironmentObject var app: AppState
     let category: NewsFeedCategory
 
     @State private var items: [NewsItem] = []
-    @State private var selectedNews: NewsItem?
     @State private var isLoading = false
     @State private var lastError: String?
     @State private var refreshTick = 0
 
+    /// 按日期分组（日历/财报用）
+    private var grouped: [(Date, [NewsItem])] {
+        let cal = Calendar.current
+        var buckets: [Date: [NewsItem]] = [:]
+        for item in items {
+            let day = cal.startOfDay(for: item.publishedAt)
+            buckets[day, default: []].append(item)
+        }
+        return buckets.keys.sorted(by: >).map { ($0, buckets[$0]!.sorted { $0.publishedAt > $1.publishedAt }) }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部工具条（分类 + 刷新 + 最后刷新时间）
+            // 顶部工具条
             HStack {
                 Label(category.displayName, systemImage: category.icon)
                     .font(.headline)
@@ -36,10 +46,22 @@ struct NewsListView: View {
 
             Divider()
 
-            List(selection: $selectedNews) {
-                ForEach(items) { item in
-                    NewsRow(item: item)
-                        .tag(item)
+            List(selection: $app.selectedNews) {
+                if category == .calendar || category == .earnings {
+                    // 按日期分组展示
+                    ForEach(grouped, id: \.0) { day, dayItems in
+                        Section(header: Text(dayHeader(day))) {
+                            ForEach(dayItems) { item in
+                                NewsRow(item: item)
+                                    .tag(item)
+                            }
+                        }
+                    }
+                } else {
+                    ForEach(items) { item in
+                        NewsRow(item: item)
+                            .tag(item)
+                    }
                 }
             }
             .overlay {
@@ -58,15 +80,20 @@ struct NewsListView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            if let item = selectedNews {
-                NewsReaderBar(item: item)
-                    .frame(height: 300)
-            }
-        }
         .task(id: "\(category.rawValue)-\(refreshTick)") {
             await load()
         }
+        .onChange(of: category) { _, _ in
+            app.selectedNews = nil
+        }
+    }
+
+    private func dayHeader(_ day: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(day) { return "今天" }
+        if cal.isDateInTomorrow(day) { return "明天" }
+        if cal.isDateInYesterday(day) { return "昨天" }
+        return day.formatted(.dateTime.month().day().weekday(.wide))
     }
 
     private func load() async {
@@ -132,9 +159,9 @@ struct TagChip: View {
     }
 }
 
-// MARK: - 阅读页（底部条）：正文 + AI 对话 + 打标
+// MARK: - 资讯详情页（detail 列）：正文在上，模型对话框固定底部
 
-struct NewsReaderBar: View {
+struct NewsDetailView: View {
     @EnvironmentObject var app: AppState
     let item: NewsItem
 
@@ -143,72 +170,87 @@ struct NewsReaderBar: View {
     @State private var isThinking = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(item.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                Spacer()
-                if let tag = item.aiTag {
-                    Text("AI 判断：\(tag.impact == .positive ? "利好" : (tag.impact == .negative ? "利空" : "中性")) / \(tag.stance == .bullish ? "看多" : (tag.stance == .bearish ? "看空" : "中性"))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Button("在浏览器打开") {
-                    if let url = URL(string: item.url) {
-                        NSWorkspace.shared.open(url)
+        VStack(spacing: 0) {
+            // 正文区（可滚动）
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Text(item.source)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(item.publishedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if let tag = item.aiTag {
+                            Text("AI 判断：\(tag.impact == .positive ? "利好" : (tag.impact == .negative ? "利空" : "中性")) / \(tag.stance == .bullish ? "看多" : (tag.stance == .bearish ? "看空" : "中性"))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Button {
+                            if let url = URL(string: item.url) {
+                                NSWorkspace.shared.open(url)
+                            }
+                        } label: {
+                            Label("浏览器打开", systemImage: "safari")
+                        }
+                        .controlSize(.small)
                     }
-                }
-                .controlSize(.small)
-            }
-            Divider()
-            HStack(alignment: .top, spacing: 12) {
-                // 摘要区
-                ScrollView {
+                    Text(item.title)
+                        .font(.title2.weight(.semibold))
+                        .textSelection(.enabled)
+                    Divider()
                     Text(item.content ?? item.summary)
-                        .font(.callout)
+                        .font(.body)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity)
-                Divider()
-                // AI 对话区
-                VStack(alignment: .leading, spacing: 6) {
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 6) {
-                                if messages.isEmpty {
-                                    Text("就本条新闻提问，例如：\n「这条新闻对哪只股票影响最大？」\n「接下来可能怎么走？」")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                ForEach(Array(messages.enumerated()), id: \.offset) { _, msg in
-                                    MessageBubble(message: msg)
-                                }
-                                if isThinking {
-                                    HStack(spacing: 6) {
-                                        ProgressView().controlSize(.small)
-                                        Text("思考中…").font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                    HStack(spacing: 6) {
-                        TextField("询问本条新闻…", text: $input)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit { send() }
-                        Button("发送") { send() }
-                            .keyboardShortcut(.defaultAction)
-                            .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)
+                .padding(16)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            // AI 对话区（固定底部）
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("AI 问询", systemImage: "brain")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if isThinking {
+                        ProgressView()
+                            .controlSize(.small)
                     }
                 }
-                .frame(width: 380)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 6) {
+                            if messages.isEmpty {
+                                Text("就本条资讯提问：\n「这条消息对哪只股票影响最大？」\n「接下来行情可能怎么走？」")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            ForEach(Array(messages.enumerated()), id: \.offset) { _, msg in
+                                MessageBubble(message: msg)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .frame(height: 120)
+                HStack(spacing: 6) {
+                    TextField("询问本条资讯…", text: $input)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { send() }
+                    Button("发送") { send() }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)
+                }
             }
+            .padding(12)
+            .background(.bar)
         }
-        .padding(12)
-        .background(.bar)
     }
 
     private func send() {
@@ -217,13 +259,13 @@ struct NewsReaderBar: View {
         input = ""
         let ai = app.aiSettings
         let system = """
-        你是一个财经新闻分析助手。以下是用户正在阅读的新闻：
+        你是一个财经资讯分析助手。以下是用户正在阅读的资讯：
 
         标题：\(item.title)
         \(item.content.map { "正文：\n\($0)" } ?? "摘要：\(item.summary)")
         来源：\(item.source)，发布于 \(item.publishedAt.formatted())
 
-        用户会就这条新闻提问。回答使用简体中文，结合新闻内容与财经常识，
+        用户会就这条资讯提问。回答使用简体中文，结合资讯内容与财经常识，
         明确指出不确定性和风险，不要给出确定性的投资建议。
         """
         messages.append(.user(text))

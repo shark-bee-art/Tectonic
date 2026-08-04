@@ -36,6 +36,8 @@ public enum NewsFeedKind: String, Codable, Sendable, CaseIterable {
     case eastMoneyFlash      // 东财 7x24 快讯
     case eastMoneyResearch   // 东财研报
     case eastMoneyEarnings   // 东财财报日历
+    case odaily              // Odaily 星球日报（加密）
+    case investingCalendar   // Investing.com 宏观经济日历
     case rss                 // 通用 RSS
 }
 
@@ -67,17 +69,24 @@ public enum NewsFeedCatalog {
         // 快讯
         NewsFeed(name: "金十数据·快讯", category: .flash, kind: .jin10Flash, url: "jin10"),
         NewsFeed(name: "东方财富·7x24", category: .flash, kind: .eastMoneyFlash, url: "eastmoney"),
+        NewsFeed(name: "Odaily·加密快讯", category: .flash, kind: .odaily, url: "odaily"),
         // 研报
         NewsFeed(name: "东方财富·机构研报", category: .research, kind: .eastMoneyResearch, url: "eastmoney"),
         // 财报
         NewsFeed(name: "东方财富·业绩报表", category: .earnings, kind: .eastMoneyEarnings, url: "eastmoney"),
-        // 日历（财报日历按公告日展示）
-        NewsFeed(name: "东方财富·财报日历", category: .calendar, kind: .eastMoneyEarnings, url: "eastmoney-calendar"),
-        // RSS（可选，默认关闭英文源）
+        // 日历（宏观经济数据：CPI/PPI/PMI 等，按日期分组）
+        NewsFeed(name: "Investing·宏观经济日历", category: .calendar, kind: .investingCalendar, url: "investing"),
+        // RSS（默认开启中文/主流英文源，覆盖美股与加密）
         NewsFeed(name: "CNBC Top News", category: .flash, kind: .rss,
-                 url: "https://www.cnbc.com/id/100003114/device/rss/rss.html", enabled: false),
-        NewsFeed(name: "Reuters Business", category: .flash, kind: .rss,
-                 url: "https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best", enabled: false),
+                 url: "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
+        NewsFeed(name: "MarketWatch Top", category: .flash, kind: .rss,
+                 url: "https://feeds.marketwatch.com/marketwatch/topstories/"),
+        NewsFeed(name: "CoinDesk", category: .flash, kind: .rss,
+                 url: "https://www.coindesk.com/arc/outboundfeeds/rss/"),
+        NewsFeed(name: "CoinTelegraph", category: .flash, kind: .rss,
+                 url: "https://cointelegraph.com/rss"),
+        NewsFeed(name: "The Block", category: .flash, kind: .rss,
+                 url: "https://www.theblock.co/rss.xml", enabled: false),
     ]
 
     public static let importedFlagKey = "news_feeds_imported"
@@ -112,6 +121,10 @@ public enum NewsSourceRegistry {
             return try await EastMoneyResearchSource().fetch(limit: limit)
         case .eastMoneyEarnings:
             return try await EastMoneyEarningsSource().fetch(limit: limit)
+        case .odaily:
+            return try await OdailySource().fetch(limit: limit)
+        case .investingCalendar:
+            return try await InvestingCalendarSource().fetch(limit: limit)
         case .rss:
             guard let url = URL(string: feed.url) else {
                 throw NewsSourceError.notSupported("无效的 RSS 地址")
