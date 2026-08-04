@@ -111,6 +111,7 @@ public enum L10n {
         "news.empty": ["zh": "暂无内容\n请在设置 → 资讯源中启用订阅源", "en": "No content\nEnable feeds in Settings → News Sources", "ja": "コンテンツなし\n設定→ニュースソースで有効化"],
         // 持仓
         "holdings.empty": ["zh": "暂无持仓数据", "en": "No holdings", "ja": "保有銘柄なし"],
+        "holdings.add": ["zh": "添加持仓", "en": "Add Holding", "ja": "保有銘柄を追加"],
         "holdings.emptyHint": ["zh": "点击下方按钮手动添加持仓\n支持股票、债券、基金、货币、加密货币、期权等", "en": "Add holdings manually\nStocks, bonds, funds, currencies, crypto, options…", "ja": "保有銘柄を手動で追加\n株式・債券・ファンド・通貨・暗号資産・オプション等"],
         "holdings.importToWatchlist": ["zh": "一键导入自选", "en": "Add All to Watchlist", "ja": "すべてウォッチリストへ"],
         "holdings.imported": ["zh": "已添加", "en": "Added", "ja": "追加済み"],

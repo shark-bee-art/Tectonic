@@ -59,10 +59,10 @@ struct HoldingsView: View {
             Button {
                 showManualAdd = true
             } label: {
-                Label(L10n.l("tx.add"), systemImage: "plus.circle")
+                Label(L10n.l("holdings.add"), systemImage: "plus.circle")
             }
             .buttonStyle(.borderedProminent)
-            .help(L10n.l("tx.add"))
+            .help(L10n.l("holdings.add"))
             if let msg = importMessage {
                 Text(msg)
                     .font(.callout)
@@ -128,9 +128,9 @@ struct HoldingsView: View {
                 Button {
                     showManualAdd = true
                 } label: {
-                    Label(L10n.l("tx.add"), systemImage: "plus")
+                    Label(L10n.l("holdings.add"), systemImage: "plus")
                 }
-                .help(L10n.l("tx.add"))
+                .help(L10n.l("holdings.add"))
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(L10n.l("holdings.importToWatchlist")) {
@@ -210,14 +210,10 @@ struct HoldingEditor: View {
     @State private var assetType: AssetType = .stock
     @State private var quantity: String = ""
     @State private var costBasis: String = ""
-    @State private var hasOption: Bool = false
-    @State private var callPut: String = "call"
-    @State private var strike: String = ""
-    @State private var expiry: Date = Date().addingTimeInterval(30 * 86400)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(L10n.l("tx.add"))
+            Text(L10n.l("holdings.add"))
                 .font(.title2.weight(.semibold))
 
             Form {
@@ -236,27 +232,12 @@ struct HoldingEditor: View {
                         }
                     }
                     Picker(L10n.l("tx.assetType"), selection: $assetType) {
-                        ForEach(AssetType.allCases) { t in
-                            Text(t.displayName).tag(t)
+                        ForEach(HoldingAssetTypes.allCases) { t in
+                            Text(t.displayName).tag(t.rawValueAsAssetType)
                         }
                     }
                     TextField(L10n.l("tx.quantity"), text: $quantity)
                     TextField(L10n.l("holdings.cost"), text: $costBasis)
-                }
-
-                if assetType == .option {
-                    Section(L10n.l("asset.option")) {
-                        Toggle("期权", isOn: $hasOption)
-                        if hasOption {
-                            Picker(L10n.l("option.callPut"), selection: $callPut) {
-                                Text(L10n.l("option.call")).tag("call")
-                                Text(L10n.l("option.put")).tag("put")
-                            }
-                            .pickerStyle(.segmented)
-                            TextField(L10n.l("option.strike"), text: $strike)
-                            DatePicker(L10n.l("option.expiry"), selection: $expiry, displayedComponents: .date)
-                        }
-                    }
                 }
             }
             .formStyle(.grouped)
@@ -271,7 +252,7 @@ struct HoldingEditor: View {
             }
         }
         .padding(20)
-        .frame(width: 400, height: 480)
+        .frame(width: 400, height: 400)
     }
 
     /// 从代码推断市场/名称
@@ -287,18 +268,24 @@ struct HoldingEditor: View {
 
     private func save() {
         let c = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        let option: OptionSpec? = assetType == .option && hasOption
-            ? OptionSpec(callPut: callPut, strikePrice: Double(strike) ?? 0, expiryDate: expiry)
-            : nil
         let holding = Holding(symbol: Symbol(market: market, code: c, name: name.isEmpty ? c : name),
                               quantity: Double(quantity) ?? 0,
                               costBasis: Double(costBasis) ?? 0,
                               broker: "手动",
-                              assetType: assetType,
-                              option: option)
+                              assetType: assetType)
         onSave(holding)
         dismiss()
     }
+}
+
+/// 持仓支持的资产类别（不含期权，保持简洁）
+private enum HoldingAssetTypes: String, CaseIterable, Identifiable {
+    case stock, bond, fund, currency, crypto, other
+    var id: String { rawValue }
+    var displayName: String {
+        AssetType(rawValue: rawValue)?.displayName ?? rawValue
+    }
+    var rawValueAsAssetType: AssetType { AssetType(rawValue: rawValue) ?? .stock }
 }
 
 // MARK: - JSON 持仓解析
