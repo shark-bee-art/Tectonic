@@ -1,22 +1,21 @@
 import SwiftUI
 import CoreKit
 
-/// 标的详情：行情概览 + K线（苹果股市风格）+ AI 问询对话
+/// 标的详情：行情概览 + 技术面数据 + AI 问询对话
 struct QuoteDetailView: View {
     @EnvironmentObject var app: AppState
     let symbol: Symbol
 
     @State private var quote: Quote?
-    @State private var bars: [KLineBar] = []
-    @State private var range: ChartRange = .threeMonth
-    @State private var isLoadingKline = false
-    @State private var klineError: String?
+    @State private var technical: TechnicalSummary?
+    @State private var isLoadingTech = false
+    @State private var techError: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
-                klineSection
+                technicalSection
                 aiChatSection
             }
             .padding(20)
@@ -26,8 +25,8 @@ struct QuoteDetailView: View {
         .task(id: symbol.id) {
             quote = await app.store.quote(for: symbol)
         }
-        .task(id: "\(symbol.id)-\(range.rawValue)") {
-            await loadKline()
+        .task(id: "\(symbol.id)-tech") {
+            await loadTechnical()
         }
     }
 
@@ -58,87 +57,136 @@ struct QuoteDetailView: View {
         }
     }
 
-    // MARK: K线（苹果股市风格）
+    // MARK: 技术面数据
 
-    private var klineSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var technicalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("K线")
+                Text("技术面")
                     .font(.headline)
                 Spacer()
-                Picker("时间范围", selection: $range) {
-                    ForEach(ChartRange.allCases) { r in
-                        Text(r.rawValue).tag(r)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 300)
-            }
-            // 当前范围最近一根 OHLC 信息（苹果股市顶部信息条）
-            if let last = bars.last {
-                let up = last.close >= last.open
-                HStack(spacing: 16) {
-                    infoItem("开", fmt(last.open))
-                    infoItem("高", fmt(last.high))
-                    infoItem("低", fmt(last.low))
-                    infoItem("收", fmt(last.close), color: up ? Color.red : Color.green)
-                    Text("\(fmtSigned(last.close - last.open)) (\(fmtPercent((last.close - last.open) / last.open * 100)))")
-                        .font(.callout.monospacedDigit())
-                        .foregroundStyle(up ? Color.red : Color.green)
-                    Spacer()
-                    Text(periodLabel)
+                if let t = technical {
+                    Text(t.period)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 2)
             }
-            if isLoadingKline {
+
+            if isLoadingTech {
                 ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 280)
-            } else if let klineError {
-                Text(klineError)
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            } else if let techError {
+                Text(techError)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 280)
-            } else if bars.isEmpty {
-                Text("暂无数据")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 280)
-            } else {
-                KLineChart(bars: bars)
-                    .frame(height: 300)
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            } else if let t = technical {
+                VStack(alignment: .leading, spacing: 14) {
+                    // 关键价位
+                    HStack(spacing: 12) {
+                        levelCard(title: "支撑位", value: t.support, current: t.currentPrice, isBelow: true)
+                        levelCard(title: "阻力位", value: t.resistance, current: t.currentPrice, isBelow: false)
+                        levelCard(title: "52周低", value: t.low52w, current: t.currentPrice, isBelow: true)
+                        levelCard(title: "52周高", value: t.high52w, current: t.currentPrice, isBelow: false)
+                    }
+
+                    Divider()
+
+                    // 均线
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("均线")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
+                            maRow("MA20", value: t.sma20, current: t.currentPrice)
+                            maRow("MA50", value: t.sma50, current: t.currentPrice)
+                            maRow("MA200", value: t.sma200, current: t.currentPrice)
+                        }
+                    }
+
+                    Divider()
+
+                    // 动量与量能
+                    HStack(spacing: 24) {
+                        metricItem("年初至今", value: t.ytdChangePercent.map { fmtPercent($0) } ?? "—",
+                                   color: (t.ytdChangePercent ?? 0) >= 0 ? Color.red : Color.green)
+                        if t.avgVolume20 > 0 {
+                            metricItem("20日均量", value: "\(shortNum(t.avgVolume20))", color: nil)
+                        }
+                        Spacer()
+                    }
+                }
             }
         }
-        .padding(12)
+        .padding(14)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
     }
 
-    private func infoItem(_ label: String, _ value: String, color: Color? = nil) -> some View {
-        HStack(spacing: 4) {
-            Text(label)
+    /// 价位卡片：值 + 距现价 %
+    private func levelCard(title: String, value: Double?, current: Double, isBelow: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let value {
+                Text(fmt(value))
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                let diff = (value - current) / current * 100
+                Text("\(fmtSigned(diff))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(isBelow ? Color.green : Color.red)
+            } else {
+                Text("—")
+                    .font(.title3.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.03)))
+    }
+
+    /// 均线行：值 + 现价相对位置（高于/低于）
+    private func maRow(_ name: String, value: Double?, current: Double) -> some View {
+        GridRow {
+            Text(name)
+                .foregroundStyle(.secondary)
+            if let value {
+                Text(fmt(value))
+                    .monospacedDigit()
+                let above = current >= value
+                Text(above ? "现价在上方" : "现价在下方")
+                    .font(.caption)
+                    .foregroundStyle(above ? Color.red : Color.green)
+                Text("\(fmtPercent((current - value) / value * 100))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("数据不足")
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
+    private func metricItem(_ title: String, value: String, color: Color?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.callout.monospacedDigit())
+                .font(.title3.weight(.semibold).monospacedDigit())
                 .foregroundStyle(color ?? Color.primary)
         }
     }
 
-    /// 当前范围使用的周期描述
-    private var periodLabel: String {
-        let (period, _) = range.target
-        return period == .m5 ? "分时" : "\(period.displayName) · \(bars.count) 根"
-    }
-
-    private func loadKline() async {
-        isLoadingKline = true
-        defer { isLoadingKline = false }
-        let (period, limit) = range.target
+    private func loadTechnical() async {
+        isLoadingTech = true
+        defer { isLoadingTech = false }
         do {
-            bars = try await app.store.kline(for: symbol, period: period, limit: limit)
-            klineError = nil
+            technical = try await app.store.technicalSummary(for: symbol)
+            techError = nil
         } catch {
-            bars = []
-            klineError = "K线加载失败: \(error.localizedDescription)"
+            technical = nil
+            techError = "技术面计算失败: \(error.localizedDescription)"
         }
     }
 
@@ -163,10 +211,13 @@ struct QuoteDetailView: View {
     private func fmtPercent(_ v: Double) -> String {
         String(format: "%+.2f%%", v)
     }
+    private func shortNum(_ v: Double) -> String {
+        if v >= 1_000_000_000 { return String(format: "%.1fB", v / 1_000_000_000) }
+        if v >= 1_000_000 { return String(format: "%.1fM", v / 1_000_000) }
+        if v >= 1_000 { return String(format: "%.1fK", v / 1_000) }
+        return String(format: "%.0f", v)
+    }
 }
-
-// MARK: - 自选开关（工具栏）
-
 struct WatchlistToggle: View {
     @EnvironmentObject var app: AppState
     let symbol: Symbol
@@ -305,3 +356,4 @@ struct MessageBubble: View {
         }
     }
 }
+

@@ -11,22 +11,33 @@ public struct YahooSource: MarketDataSource, Sendable {
     // crumb 缓存（5 分钟过期；非隔离静态变量，Swift 6 下标记 unsafe）
     nonisolated(unsafe) private static var cachedCrumb: String?
     nonisolated(unsafe) private static var crumbFetchedAt: Date?
+    // 熔断：获取失败后 10 分钟内快速失败，避免每次等网络超时
+    nonisolated(unsafe) private static var crumbFailedAt: Date?
 
     /// 获取 crumb（带 cookie 缓存；URLSession.shared 自动管理 cookie）
+    /// 风控期拿不到 crumb 时快速失败（返回 nil），避免长时间等待
     private func crumb() async throws -> String? {
         if let c = Self.cachedCrumb,
            let at = Self.crumbFetchedAt,
            Date().timeIntervalSince(at) < 300 {
             return c
         }
-        // 1. 访问首页种 cookie
-        if let fc = URL(string: "https://fc.yahoo.com") {
-            _ = try? await HTTP.get(fc, timeout: 10)
+        // 熔断：之前失败过则直接快速失败
+        if let f = Self.crumbFailedAt, Date().timeIntervalSince(f) < 600 {
+            return nil
         }
-        // 2. 取 crumb
+        // 1. 访问首页种 cookie（快速失败，不等超时）
+        if let fc = URL(string: "https://fc.yahoo.com") {
+            var request = URLRequest(url: fc)
+            request.timeoutInterval = 5
+            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+                             forHTTPHeaderField: "User-Agent")
+            _ = try? await URLSession.shared.data(for: request)
+        }
+        // 2. 取 crumb（快速失败）
         if let crumbURL = URL(string: "https://query1.finance.yahoo.com/v1/test/getcrumb") {
             var request = URLRequest(url: crumbURL)
-            request.timeoutInterval = 15
+            request.timeoutInterval = 6
             request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
                              forHTTPHeaderField: "User-Agent")
             if let (data, response) = try? await URLSession.shared.data(for: request),
@@ -36,22 +47,28 @@ public struct YahooSource: MarketDataSource, Sendable {
                 if let c, !c.isEmpty {
                     Self.cachedCrumb = c
                     Self.crumbFetchedAt = Date()
+                    Self.crumbFailedAt = nil
                     return c
                 }
             }
         }
+        // 获取失败 → 记录熔断时间
+        Self.crumbFailedAt = Date()
         return Self.cachedCrumb
     }
 
-    /// 给 URL 追加 crumb 参数
-    private func crumbedURL(_ base: String) async -> URL? {
-        guard var components = URLComponents(string: base) else { return nil }
+    /// 给 URL 追加 crumb 参数；拿不到 crumb 时快速抛错（避免 chart 请求等超时）
+    private func crumbedURL(_ base: String) async throws -> URL {
+        guard var components = URLComponents(string: base) else {
+            throw DataSourceError.invalidURL(base)
+        }
         if let c = try? await crumb() {
             var items = components.queryItems ?? []
             items.append(URLQueryItem(name: "crumb", value: c))
             components.queryItems = items
+            return components.url ?? URL(string: base)!
         }
-        return components.url
+        throw DataSourceError.notSupported("Yahoo 风控中（无法获取 crumb），暂不可用")
     }
 
     // MARK: 代码转换
@@ -84,8 +101,8 @@ public struct YahooSource: MarketDataSource, Sendable {
     public func fetchQuote(for symbol: Symbol) async throws -> Quote {
         let code = yahooCode(symbol)
         let urlStr = "https://query1.finance.yahoo.com/v8/finance/chart/\(code)?interval=1d&range=5d"
-        guard let url = await crumbedURL(urlStr) else {
-            throw DataSourceError.invalidURL(urlStr)
+        guard let url = try? await crumbedURL(urlStr) else {
+            throw DataSourceError.notSupported("Yahoo 暂不可用")
         }
         let chart = try await HTTP.getJSON(url, as: YahooChartResponse.self)
         guard let result = chart.chart?.result?.first,
@@ -116,8 +133,8 @@ public struct YahooSource: MarketDataSource, Sendable {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
         let urlStr = "https://query1.finance.yahoo.com/v1/finance/search?q=\(trimmed.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? trimmed)"
-        guard let url = await crumbedURL(urlStr) else {
-            throw DataSourceError.invalidURL(urlStr)
+        guard let url = try? await crumbedURL(urlStr) else {
+            throw DataSourceError.notSupported("Yahoo 暂不可用")
         }
         let resp = try await HTTP.getJSON(url, as: YahooSearchResponse.self)
         var result: [Symbol] = []
@@ -154,8 +171,8 @@ public struct YahooSource: MarketDataSource, Sendable {
         case .m5:   (interval, range) = ("5m", "1d")
         }
         let urlStr = "https://query1.finance.yahoo.com/v8/finance/chart/\(code)?interval=\(interval)&range=\(range)"
-        guard let url = await crumbedURL(urlStr) else {
-            throw DataSourceError.invalidURL(urlStr)
+        guard let url = try? await crumbedURL(urlStr) else {
+            throw DataSourceError.notSupported("Yahoo 暂不可用")
         }
         let chart = try await HTTP.getJSON(url, as: YahooChartResponse.self)
         guard let result = chart.chart?.result?.first,

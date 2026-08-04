@@ -7,26 +7,33 @@ public struct FundSource: MarketDataSource, Sendable {
     public var name: String { "天天基金" }
     public var supportedMarkets: Set<Market> { [.fund] }
 
-    /// 拉取最近 N 条净值（最新在前）
+    /// 拉取最近 N 条净值（最新在前；接口每页固定 20 行，需翻页）
     private func fetchNavList(code: String, limit: Int) async throws -> [[String: Any]] {
-        let urlStr = "https://api.fund.eastmoney.com/f10/lsjz?fundCode=\(code)&pageIndex=1&pageSize=\(limit)"
-        guard let url = URL(string: urlStr) else {
-            throw DataSourceError.invalidURL(urlStr)
+        var all: [[String: Any]] = []
+        var page = 1
+        while all.count < limit && page <= 30 {
+            let urlStr = "https://api.fund.eastmoney.com/f10/lsjz?fundCode=\(code)&pageIndex=\(page)&pageSize=20"
+            guard let url = URL(string: urlStr) else {
+                throw DataSourceError.invalidURL(urlStr)
+            }
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 15
+            request.setValue("http://fundf10.eastmoney.com/", forHTTPHeaderField: "Referer")
+            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                throw DataSourceError.httpError(http.statusCode)
+            }
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let dataDict = json["Data"] as? [String: Any],
+                  let list = dataDict["LSJZList"] as? [[String: Any]] else {
+                throw DataSourceError.parseFailed("天天基金净值解析失败")
+            }
+            if list.isEmpty { break }
+            all.append(contentsOf: list)
+            page += 1
         }
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 20
-        request.setValue("http://fundf10.eastmoney.com/", forHTTPHeaderField: "Referer")
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw DataSourceError.httpError(http.statusCode)
-        }
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let dataDict = json["Data"] as? [String: Any],
-              let list = dataDict["LSJZList"] as? [[String: Any]] else {
-            throw DataSourceError.parseFailed("天天基金净值解析失败")
-        }
-        return list
+        return Array(all.prefix(limit))
     }
 
     // MARK: 行情（最新净值）

@@ -71,6 +71,22 @@ struct TectonicCLI {
                 exit(1)
             }
 
+        case "tech":
+            guard args.count >= 2, let symbol = parseSymbol(args[1]) else { print("用法: tech <market>:<code>"); exit(1) }
+            do {
+                let bars = try await MarketDataSourceRegistry.shared.fetchKLine(for: symbol, period: .day, limit: 300)
+                let t = TechnicalAnalyzer.analyze(bars: bars)
+                print("\(symbol.code) \(symbol.name) — \(t.period)")
+                print("  现价: \(fmt(t.currentPrice))")
+                print("  支撑: \(t.support.map { fmt($0) } ?? "—")  阻力: \(t.resistance.map { fmt($0) } ?? "—")")
+                print("  MA20: \(t.sma20.map { fmt($0) } ?? "—")  MA50: \(t.sma50.map { fmt($0) } ?? "—")  MA200: \(t.sma200.map { fmt($0) } ?? "—")")
+                print("  YTD: \(t.ytdChangePercent.map { fmtPercent($0) } ?? "—")  52周高: \(t.high52w.map { fmt($0) } ?? "—")  52周低: \(t.low52w.map { fmt($0) } ?? "—")")
+                if t.avgVolume20 > 0 { print("  20日均量: \(Int(t.avgVolume20))") }
+            } catch {
+                print("失败: \(error.localizedDescription)")
+                exit(1)
+            }
+
         case "search":
             guard args.count >= 2 else { print("用法: search <query> [market]"); exit(1) }
             let market = args.count >= 3 ? Market(rawValue: args[2]) : nil

@@ -177,14 +177,22 @@ public final class MarketDataSourceRegistry: Sendable {
 
     public func fetchKLine(for symbol: Symbol, period: KLinePeriod, limit: Int = 320) async throws -> [KLineBar] {
         let candidates = sources(for: symbol.market)
+        // 所有候选源都试，取数据最全的（腾讯国际 K线历史少时自动用 Yahoo 补齐）
+        var best: [KLineBar] = []
         var lastError: Error?
         for source in candidates {
             do {
                 let bars = try await source.fetchKLine(for: symbol, period: period, limit: limit)
-                if !bars.isEmpty { return bars }
+                if bars.count > best.count {
+                    best = bars
+                }
+                if best.count >= limit { break }   // 已够数，不再试后续源
             } catch {
                 lastError = error
             }
+        }
+        if !best.isEmpty {
+            return Array(best.suffix(limit))
         }
         // 明确不支持优先抛出；限流类错误（Yahoo 403 等）转成友好提示
         if let e = lastError as? DataSourceError, case .notSupported = e {

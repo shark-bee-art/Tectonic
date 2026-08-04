@@ -109,6 +109,12 @@ public final class Store: ObservableObject {
         try await registry.fetchKLine(for: symbol, period: period, limit: limit)
     }
 
+    /// 技术面摘要：拉日K（≥260 根）计算支撑/阻力/均线/YTD/52周高低
+    public func technicalSummary(for symbol: Symbol) async throws -> TechnicalSummary {
+        let bars = try await registry.fetchKLine(for: symbol, period: .day, limit: 300)
+        return TechnicalAnalyzer.analyze(bars: bars)
+    }
+
     public func search(query: String, market: Market? = nil) async -> [Symbol] {
         (try? await registry.search(query: query, market: market)) ?? []
     }
