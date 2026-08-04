@@ -7,10 +7,6 @@ struct TransactionsView: View {
     @State private var editing: Trade?
     @State private var showEditor = false
     @State private var selected: Trade?
-    @State private var showImporter = false
-    @State private var previewTrades: [ParsedTrade] = []
-    @State private var showPreview = false
-    @State private var pendingURL: URL?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,31 +60,6 @@ struct TransactionsView: View {
                 }
                 .help(L10n.l("tx.add"))
             }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showImporter = true
-                } label: {
-                    Label(L10n.l("common.import"), systemImage: "square.and.arrow.down")
-                }
-                .help(L10n.l("holdings.importFile"))
-            }
-        }
-        .fileImporter(isPresented: $showImporter,
-                      allowedContentTypes: [.commaSeparatedText, .json, .data, .plainText]) { result in
-            handleImport(result)
-        }
-        .sheet(isPresented: $showPreview) {
-            TradeImportPreviewSheet(trades: previewTrades, sourceURL: pendingURL) { trades in
-                if !trades.isEmpty {
-                    for t in trades {
-                        try? app.store.upsertTrade(t)
-                    }
-                    showPreview = false
-                } else {
-                    showPreview = false
-                }
-            }
-            .environmentObject(app)
         }
         .sheet(isPresented: $showEditor) {
             TradeEditor(tx: editing) { saved in
@@ -98,48 +69,6 @@ struct TransactionsView: View {
         }
     }
 
-    /// 导入券商交易文件：规则解析 → 预览；空则提示
-    private func handleImport(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let url):
-            pendingURL = url
-            guard url.startAccessingSecurityScopedResource() else { return }
-            defer { url.stopAccessingSecurityScopedResource() }
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
-            if url.pathExtension.lowercased() == "json" {
-                previewTrades = parseJSONTrades(text)
-            } else {
-                previewTrades = TradeCSVParser.parse(text)
-            }
-            if previewTrades.isEmpty {
-                return
-            }
-            showPreview = true
-        case .failure:
-            break
-        }
-    }
-
-    /// JSON 交易解析（{symbol, direction, quantity, price, fee, date} 数组）
-    private func parseJSONTrades(_ text: String) -> [ParsedTrade] {
-        guard let data = text.data(using: .utf8),
-              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
-        var trades: [ParsedTrade] = []
-        for item in arr {
-            guard let symbol = (item["symbol"] as? String) ?? (item["ticker"] as? String),
-                  let qty = (item["quantity"] as? Double) ?? RobustCSV.cleanNumber((item["quantity"] as? String) ?? ""),
-                  let price = (item["price"] as? Double) ?? RobustCSV.cleanNumber((item["price"] as? String) ?? "") else { continue }
-            let dir = (item["direction"] as? String) == "sell" ? "sell" : "buy"
-            let date = (item["date"] as? String).flatMap { TradeCSVParser.parseDate($0) }
-            trades.append(ParsedTrade(date: date, symbol: symbol,
-                                      name: (item["name"] as? String) ?? symbol,
-                                      direction: dir, quantity: qty, price: price,
-                                      fee: (item["fee"] as? Double) ?? 0,
-                                      market: Market(rawValue: (item["market"] as? String) ?? "") ?? RobustCSV.inferMarket(symbol),
-                                      assetType: AssetType(rawValue: (item["assetType"] as? String) ?? "") ?? .stock))
-        }
-        return trades
-    }
 }
 
 /// 交易行
@@ -229,159 +158,6 @@ struct TradeSummaryBar: View {
         }
         .padding(12)
         .background(.bar)
-    }
-}
-
-/// 交易导入预览确认（规则解析结果 + AI 兜底）
-struct TradeImportPreviewSheet: View {
-    @EnvironmentObject var app: AppState
-    @State var trades: [ParsedTrade]
-    let sourceURL: URL?
-    let onConfirm: ([Trade]) -> Void
-
-    @State private var isAIParsing = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.l("tx.title"))
-                .font(.headline)
-            Text("\(trades.count) \(L10n.l("tx.title"))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            Table(Array(trades.prefix(15).enumerated()).map { TradeRowModel(index: $0.offset, trade: $0.element) }) {
-                TableColumn(L10n.l("tx.date")) { m in
-                    Text(m.trade.date?.formatted(.dateTime.month().day()) ?? "—")
-                }
-                TableColumn(L10n.l("tx.code")) { m in
-                    Text(m.trade.symbol).font(.callout.monospaced())
-                }
-                TableColumn(L10n.l("tx.name")) { m in
-                    Text(m.trade.name)
-                }
-                TableColumn(L10n.l("tx.direction")) { m in
-                    Text(m.trade.direction == "buy" ? L10n.l("tx.buy") : L10n.l("tx.sell"))
-                        .foregroundStyle(m.trade.direction == "buy" ? Color.red : Color.green)
-                }
-                TableColumn(L10n.l("tx.quantity")) { m in
-                    Text(m.trade.quantity, format: .number.precision(.fractionLength(2)))
-                }
-                TableColumn(L10n.l("tx.price")) { m in
-                    Text(m.trade.price, format: .number.precision(.fractionLength(4)))
-                }
-                TableColumn(L10n.l("tx.fee")) { m in
-                    Text(m.trade.fee, format: .number.precision(.fractionLength(2)))
-                }
-            }
-            .frame(height: 280)
-
-            HStack {
-                if isAIParsing {
-                    ProgressView(L10n.l("holdings.aiParsing"))
-                } else {
-                    Button {
-                        Task {
-                            isAIParsing = true
-                            let provider = app.aiSettings.provider
-                            let model = app.aiSettings.model
-                            let key = app.aiSettings.apiKey(for: provider)
-                            if let url = sourceURL {
-                                let ai = TradeAIParser()
-                                let aiTrades = await ai.parse(url: url, provider: provider, model: model, apiKey: key)
-                                if !aiTrades.isEmpty {
-                                    trades = aiTrades
-                                }
-                            }
-                            isAIParsing = false
-                        }
-                    } label: {
-                        Label("AI 识别（兜底）", systemImage: "brain")
-                    }
-                }
-                Spacer()
-                Button(L10n.l("common.cancel")) { onConfirm([]) }
-                Button(L10n.l("common.import")) {
-                    onConfirm(trades.map { $0.toTrade() })
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(trades.isEmpty)
-            }
-        }
-        .padding(20)
-        .frame(width: 820, height: 460)
-    }
-
-    struct TradeRowModel: Identifiable {
-        let id = UUID()
-        let index: Int
-        let trade: ParsedTrade
-    }
-}
-
-extension ParsedTrade {
-    func toTrade() -> Trade {
-        Trade(date: date ?? Date(),
-              assetType: assetType,
-              name: name, code: symbol,
-              market: market,
-              direction: direction,
-              quantity: quantity, price: price, fee: fee)
-    }
-}
-
-// MARK: - 交易 AI 解析兜底
-
-struct TradeAIParser {
-    func parse(url: URL, provider: ModelProvider, model: String, apiKey: String?) async -> [ParsedTrade] {
-        guard url.startAccessingSecurityScopedResource() else { return [] }
-        defer { url.stopAccessingSecurityScopedResource() }
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-        guard let key = apiKey else { return [] }
-
-        let prompt = """
-        识别以下券商交易记录文件，输出严格的 JSON 数组（不要任何其他文字）：
-        [{"date": "yyyy-MM-dd", "symbol": "代码", "name": "名称", "direction": "buy|sell", "quantity": 数量, "price": 价格, "fee": 手续费, "market": "us|hk|cn|crypto|fund|jp|kr|tw"}]
-
-        文件内容：
-        \(String(text.prefix(8000)))
-
-        规则：
-        - 只识别证券买卖交易（Buy/Sell/买入/卖出），忽略分红、转账、存款等
-        - 卖出方向填 sell，数量为正
-        - 无法识别的行跳过
-        """
-        do {
-            let reply = try await ModelGateway().ask(prompt, system: "你是一个精确的交易记录解析器。只输出 JSON。",
-                                                     provider: provider, model: model, apiKey: key)
-            return parseTradesJSON(reply)
-        } catch {
-            return []
-        }
-    }
-
-    private func parseTradesJSON(_ text: String) -> [ParsedTrade] {
-        var cleaned = text
-        if let start = cleaned.firstIndex(of: "["), let end = cleaned.lastIndex(of: "]") {
-            cleaned = String(cleaned[start...end])
-        }
-        guard let data = cleaned.data(using: .utf8),
-              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
-        var trades: [ParsedTrade] = []
-        for item in arr {
-            guard let symbol = item["symbol"] as? String,
-                  let qty = (item["quantity"] as? Double) ?? Double("\(item["quantity"] ?? "")"),
-                  let price = (item["price"] as? Double) ?? Double("\(item["price"] ?? "")"),
-                  qty > 0, price > 0 else { continue }
-            let dir = (item["direction"] as? String) == "sell" ? "sell" : "buy"
-            let date = (item["date"] as? String).flatMap { TradeCSVParser.parseDate($0) }
-            trades.append(ParsedTrade(date: date, symbol: symbol,
-                                      name: (item["name"] as? String) ?? symbol,
-                                      direction: dir, quantity: qty, price: price,
-                                      fee: (item["fee"] as? Double) ?? 0,
-                                      market: Market(rawValue: (item["market"] as? String) ?? "") ?? RobustCSV.inferMarket(symbol),
-                                      assetType: .stock))
-        }
-        return trades
     }
 }
 

@@ -1,18 +1,11 @@
 import SwiftUI
 import CoreKit
 import Charts
-import UniformTypeIdentifiers
 
-/// 持仓：导入（预览向导 + AI 兜底）→ 仓位视图（资产曲线 + 分布饼图 + 列表）
+/// 持仓：手动添加 → 仓位视图（资产曲线 + 分布饼图 + 列表）
 struct HoldingsView: View {
     @EnvironmentObject var app: AppState
-    @State private var showImporter = false
     @State private var importMessage: String?
-    @State private var isParsing = false
-    @State private var previewResult: CSVParseResult?
-    @State private var previewHoldings: [Holding] = []
-    @State private var showPreview = false
-    @State private var pendingURL: URL?
     @State private var showManualAdd = false
 
     /// 各持仓当前市值（quotes 优先，成本价兜底）
@@ -39,25 +32,6 @@ struct HoldingsView: View {
                 holdingsContent
             }
         }
-        .fileImporter(isPresented: $showImporter,
-                      allowedContentTypes: [.commaSeparatedText, .json, .data, .plainText]) { result in
-            handleImport(result)
-        }
-        .sheet(isPresented: $showPreview) {
-            if let result = previewResult {
-                ImportPreviewSheet(result: result, holdings: previewHoldings, sourceURL: pendingURL) { holdings in
-                    if !holdings.isEmpty {
-                        try? app.store.upsertHoldings(holdings)
-                        importMessage = "\(L10n.l("holdings.imported")) \(holdings.count)"
-                        showPreview = false
-                    } else {
-                        importMessage = L10n.l("holdings.importHint")
-                        showPreview = false
-                    }
-                }
-                .environmentObject(app)
-            }
-        }
         .sheet(isPresented: $showManualAdd) {
             HoldingEditor { holding in
                 if let h = holding {
@@ -79,24 +53,16 @@ struct HoldingsView: View {
                 .foregroundStyle(.tertiary)
             Text(L10n.l("holdings.empty"))
                 .font(.title3)
-            Text(L10n.l("holdings.emptyHint"))
+            Text(L10n.l("holdings.emptyHintManual"))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
-            Button {
-                showImporter = true
-            } label: {
-                Label(L10n.l("holdings.importFile"), systemImage: "square.and.arrow.down")
-            }
-            .buttonStyle(.borderedProminent)
             Button {
                 showManualAdd = true
             } label: {
                 Label(L10n.l("tx.add"), systemImage: "plus.circle")
             }
+            .buttonStyle(.borderedProminent)
             .help(L10n.l("tx.add"))
-            if isParsing {
-                ProgressView(L10n.l("holdings.aiParsing"))
-            }
             if let msg = importMessage {
                 Text(msg)
                     .font(.callout)
@@ -158,9 +124,6 @@ struct HoldingsView: View {
             .padding(16)
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(L10n.l("common.import")) { showImporter = true }
-            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     showManualAdd = true
@@ -235,151 +198,6 @@ struct HoldingsView: View {
             }
         }
     }
-
-    // MARK: 导入
-
-    private func handleImport(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let url):
-            isParsing = true
-            importMessage = nil
-            pendingURL = url
-            Task {
-                defer { isParsing = false }
-                let holdings = parseFile(url)
-                if holdings.isEmpty {
-                    importMessage = L10n.l("holdings.importHint")
-                    return
-                }
-                previewHoldings = holdings
-                showPreview = true
-            }
-        case .failure(let error):
-            importMessage = "\(L10n.l("common.failed")): \(error.localizedDescription)"
-        }
-    }
-
-    /// 解析文件：CSV/TSV/JSON → RobustCSV 或 JSON 解析
-    private func parseFile(_ url: URL) -> [Holding] {
-        guard url.startAccessingSecurityScopedResource() else { return [] }
-        defer { url.stopAccessingSecurityScopedResource() }
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-
-        if url.pathExtension.lowercased() == "json" {
-            return HoldingJSONParser().parse(text)
-        }
-        let result = RobustCSV.parse(text)
-        previewResult = result
-        return RobustCSV.extractHoldings(result, broker: url.lastPathComponent)
-    }
-}
-
-// MARK: - 导入预览确认向导（参考成熟 Portfolio 工具：解析 → 预览 → 字段映射确认 → 导入）
-
-struct ImportPreviewSheet: View {
-    @EnvironmentObject var app: AppState
-    @State var result: CSVParseResult
-    @State var holdings: [Holding]
-    let sourceURL: URL?
-    let onConfirm: ([Holding]) -> Void
-
-    @State private var isAIParsing = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.l("holdings.importHint"))
-                .font(.headline)
-            Text("\(result.rows.count) 行 × \(result.headers.count) 列")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            // 字段映射（自动识别，可手动调整）
-            HStack(spacing: 12) {
-                ForEach(CSVField.allCases, id: \.self) { field in
-                    Picker(field.displayName, selection: Binding(
-                        get: { result.mapping[field] ?? -1 },
-                        set: { idx in
-                            if idx >= 0 { result.mapping[field] = idx }
-                        }
-                    )) {
-                        Text("—").tag(-1)
-                        ForEach(Array(result.headers.enumerated()), id: \.offset) { idx, h in
-                            Text(h).tag(idx)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-
-            // 预览表格
-            Table(result.rows.prefix(10).map { RowModel(values: $0) }) {
-                TableColumn("代码") { row in
-                    Text(row.value(at: result.mapping[.symbol]))
-                        .font(.callout.monospaced())
-                }
-                TableColumn("名称") { row in
-                    Text(row.value(at: result.mapping[.name]))
-                }
-                TableColumn("数量") { row in
-                    Text(row.value(at: result.mapping[.quantity]))
-                }
-                TableColumn("成本") { row in
-                    Text(row.value(at: result.mapping[.costBasis]))
-                }
-            }
-            .frame(height: 240)
-
-            Text("识别出 \(holdings.count) 条持仓（前 10 行预览）")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                if isAIParsing {
-                    ProgressView(L10n.l("holdings.aiParsing"))
-                } else {
-                    Button {
-                        Task {
-                            isAIParsing = true
-                            let provider = app.aiSettings.provider
-                            let model = app.aiSettings.model
-                            let key = app.aiSettings.apiKey(for: provider)
-                            let ai = HoldingAIParser()
-                            if let url = sourceURL {
-                                let aiHoldings = await ai.parse(url: url, provider: provider, model: model, apiKey: key)
-                                if !aiHoldings.isEmpty {
-                                    holdings = aiHoldings
-                                }
-                            }
-                            isAIParsing = false
-                        }
-                    } label: {
-                        Label("AI 识别（兜底）", systemImage: "brain")
-                    }
-                }
-                Spacer()
-                Button(L10n.l("common.cancel")) { onConfirm([]) }
-                Button(L10n.l("common.import")) {
-                    onConfirm(holdings)
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(holdings.isEmpty)
-            }
-        }
-        .padding(20)
-        .frame(width: 760, height: 520)
-    }
-
-    struct RowModel: Identifiable {
-        let id = UUID()
-        let values: [String]
-        func value(at idx: Int?) -> String {
-            guard let idx, idx >= 0, idx < values.count else { return "" }
-            return values[idx]
-        }
-    }
-}
-
-// MARK: - 手动添加持仓表单
 
 struct HoldingEditor: View {
     @EnvironmentObject var app: AppState
@@ -485,40 +303,6 @@ struct HoldingEditor: View {
 
 // MARK: - JSON 持仓解析
 
-struct HoldingJSONParser {
-    func parse(_ text: String) -> [Holding] {
-        guard let data = text.data(using: .utf8) else { return [] }
-        // 支持单对象与数组
-        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            return parseItems([obj])
-        }
-        if let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-            return parseItems(arr)
-        }
-        return []
-    }
-
-    private func parseItems(_ items: [[String: Any]]) -> [Holding] {
-        var holdings: [Holding] = []
-        for item in items {
-            guard let code = (item["symbol"] as? String) ?? (item["ticker"] as? String) ?? (item["code"] as? String),
-                  let qty = (item["quantity"] as? Double) ?? (item["qty"] as? Double) ?? (item["shares"] as? Double)
-                    ?? RobustCSV.cleanNumber((item["quantity"] as? String) ?? ""),
-                  let cost = (item["cost"] as? Double) ?? (item["costBasis"] as? Double) ?? (item["price"] as? Double)
-                    ?? RobustCSV.cleanNumber((item["cost"] as? String) ?? ""),
-                  qty > 0 else { continue }
-            let market = Market(rawValue: (item["market"] as? String) ?? "") ?? RobustCSV.inferMarket(code)
-            let name = (item["name"] as? String) ?? code
-            let assetType = AssetType(rawValue: (item["assetType"] as? String) ?? "") ?? .stock
-            holdings.append(Holding(symbol: Symbol(market: market, code: code, name: name),
-                                    quantity: qty, costBasis: cost, broker: "JSON", assetType: assetType))
-        }
-        return holdings
-    }
-}
-
-// MARK: - 持仓行
-
 struct HoldingRow: View {
     let holding: Holding
     let quote: Quote?
@@ -559,75 +343,4 @@ struct HoldingRow: View {
         .padding(.vertical, 4)
     }
 }
-
-// MARK: - AI 持仓识别（模型辅助解析任意券商导出文件）
-
-struct HoldingAIParser {
-    /// 从 MainActor 上下文捕获 AI 配置后传入，避免跨 actor 传递
-    func parse(url: URL, provider: ModelProvider, model: String, apiKey: String?) async -> [Holding] {
-        guard url.startAccessingSecurityScopedResource() else { return [] }
-        defer { url.stopAccessingSecurityScopedResource() }
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-        guard let key = apiKey else { return [] }
-
-        let prompt = """
-        识别以下券商持仓导出文件，输出严格的 JSON 数组（不要任何其他文字）：
-        [{"symbol": "代码", "name": "名称", "quantity": 数量, "cost_basis": 成本价, "market": "us|hk|cn|crypto|fund|jp|kr|tw", "asset_type": "stock|bond|fund|currency|crypto|option|other"}]
-
-        文件内容：
-        \(String(text.prefix(8000)))
-
-        规则：
-        - symbol 填代码（如 AAPL、00700、600519、BTCUSDT）
-        - 期权仓位 asset_type 填 option，symbol 填标的代码
-        - 无法识别的行跳过
-        """
-        do {
-            let reply = try await ModelGateway().ask(prompt, system: "你是一个精确的持仓文件解析器。只输出 JSON。",
-                                                     provider: provider, model: model, apiKey: key)
-            return parseHoldingsJSON(reply)
-        } catch {
-            return []
-        }
-    }
-
-    private func parseHoldingsJSON(_ text: String) -> [Holding] {
-        // 提取 JSON 数组（容错：模型可能带 ```json 包裹）
-        var cleaned = text
-        if let start = cleaned.firstIndex(of: "["), let end = cleaned.lastIndex(of: "]") {
-            cleaned = String(cleaned[start...end])
-        }
-        guard let data = cleaned.data(using: .utf8),
-              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            return []
-        }
-        var holdings: [Holding] = []
-        for item in arr {
-            guard let symbol = item["symbol"] as? String,
-                  let qty = (item["quantity"] as? Double) ?? Double("\(item["quantity"] ?? "")"),
-                  let cost = (item["cost_basis"] as? Double) ?? Double("\(item["cost_basis"] ?? "")"),
-                  qty > 0 else { continue }
-            let market = Market(rawValue: (item["market"] as? String) ?? "") ?? inferMarket(symbol)
-            let assetType = AssetType(rawValue: (item["asset_type"] as? String) ?? "") ?? .stock
-            let name = (item["name"] as? String) ?? symbol
-            holdings.append(Holding(symbol: Symbol(market: market, code: symbol, name: name),
-                                    quantity: qty, costBasis: cost, broker: "AI",
-                                    assetType: assetType))
-        }
-        return holdings
-    }
-
-    private func inferMarket(_ code: String) -> Market {
-        let up = code.uppercased()
-        if up.hasSuffix(".HK") { return .hk }
-        if up.hasSuffix(".T") { return .jp }
-        if up.hasSuffix(".KS") { return .kr }
-        if up.hasSuffix(".TW") { return .tw }
-        if up.hasSuffix(".SS") || up.hasSuffix(".SZ") { return .cn }
-        if up.hasSuffix("USDT") || up.hasSuffix("USDC") || up.hasSuffix("BTC") { return .crypto }
-        if up.allSatisfy(\.isNumber), up.count == 6 {
-            return up.hasPrefix("0") || up.hasPrefix("1") ? .fund : .cn
-        }
-        return .us
-    }
 }
