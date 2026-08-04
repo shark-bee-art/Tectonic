@@ -3,14 +3,16 @@ import CoreKit
 import Charts
 import UniformTypeIdentifiers
 
-/// 持仓：导入（规则+AI 识别）→ 仓位视图（资产曲线 + 分布饼图 + 列表）
+/// 持仓：导入（预览向导 + AI 兜底）→ 仓位视图（资产曲线 + 分布饼图 + 列表）
 struct HoldingsView: View {
     @EnvironmentObject var app: AppState
     @State private var showImporter = false
     @State private var importMessage: String?
     @State private var isParsing = false
-    @State private var isAIParsing = false
-    @State private var lastImportedCount = 0
+    @State private var previewResult: CSVParseResult?
+    @State private var previewHoldings: [Holding] = []
+    @State private var showPreview = false
+    @State private var pendingURL: URL?
 
     /// 各持仓当前市值（quotes 优先，成本价兜底）
     private var marketValues: [(Holding, Double)] {
@@ -37,8 +39,23 @@ struct HoldingsView: View {
             }
         }
         .fileImporter(isPresented: $showImporter,
-                      allowedContentTypes: [.commaSeparatedText, .json, .data]) { result in
+                      allowedContentTypes: [.commaSeparatedText, .json, .data, .plainText]) { result in
             handleImport(result)
+        }
+        .sheet(isPresented: $showPreview) {
+            if let result = previewResult {
+                ImportPreviewSheet(result: result, holdings: previewHoldings, sourceURL: pendingURL) { holdings in
+                    if !holdings.isEmpty {
+                        try? app.store.upsertHoldings(holdings)
+                        importMessage = "\(L10n.l("holdings.imported")) \(holdings.count)"
+                        showPreview = false
+                    } else {
+                        importMessage = L10n.l("holdings.importHint")
+                        showPreview = false
+                    }
+                }
+                .environmentObject(app)
+            }
         }
     }
 
@@ -60,7 +77,7 @@ struct HoldingsView: View {
                 Label(L10n.l("holdings.importFile"), systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.borderedProminent)
-            if isAIParsing {
+            if isParsing {
                 ProgressView(L10n.l("holdings.aiParsing"))
             }
             if let msg = importMessage {
@@ -201,29 +218,173 @@ struct HoldingsView: View {
         case .success(let url):
             isParsing = true
             importMessage = nil
+            pendingURL = url
             Task {
                 defer { isParsing = false }
-                var holdings = HoldingParser().parse(url: url)
-                if holdings.isEmpty {
-                    // 规则解析失败 → AI 识别（捕获配置避免跨 actor）
-                    isAIParsing = true
-                    let provider = app.aiSettings.provider
-                    let model = app.aiSettings.model
-                    let key = app.aiSettings.apiKey(for: provider)
-                    holdings = await HoldingAIParser().parse(url: url, provider: provider, model: model, apiKey: key)
-                    isAIParsing = false
-                }
+                let holdings = parseFile(url)
                 if holdings.isEmpty {
                     importMessage = L10n.l("holdings.importHint")
-                } else {
-                    try? app.store.upsertHoldings(holdings)
-                    lastImportedCount = holdings.count
-                    importMessage = "\(L10n.l("holdings.imported")) \(holdings.count)"
+                    return
                 }
+                previewHoldings = holdings
+                showPreview = true
             }
         case .failure(let error):
             importMessage = "\(L10n.l("common.failed")): \(error.localizedDescription)"
         }
+    }
+
+    /// 解析文件：CSV/TSV/JSON → RobustCSV 或 JSON 解析
+    private func parseFile(_ url: URL) -> [Holding] {
+        guard url.startAccessingSecurityScopedResource() else { return [] }
+        defer { url.stopAccessingSecurityScopedResource() }
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+
+        if url.pathExtension.lowercased() == "json" {
+            return HoldingJSONParser().parse(text)
+        }
+        let result = RobustCSV.parse(text)
+        previewResult = result
+        return RobustCSV.extractHoldings(result, broker: url.lastPathComponent)
+    }
+}
+
+// MARK: - 导入预览确认向导（参考成熟 Portfolio 工具：解析 → 预览 → 字段映射确认 → 导入）
+
+struct ImportPreviewSheet: View {
+    @EnvironmentObject var app: AppState
+    @State var result: CSVParseResult
+    @State var holdings: [Holding]
+    let sourceURL: URL?
+    let onConfirm: ([Holding]) -> Void
+
+    @State private var isAIParsing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(L10n.l("holdings.importHint"))
+                .font(.headline)
+            Text("\(result.rows.count) 行 × \(result.headers.count) 列")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            // 字段映射（自动识别，可手动调整）
+            HStack(spacing: 12) {
+                ForEach(CSVField.allCases, id: \.self) { field in
+                    Picker(field.displayName, selection: Binding(
+                        get: { result.mapping[field] ?? -1 },
+                        set: { idx in
+                            if idx >= 0 { result.mapping[field] = idx }
+                        }
+                    )) {
+                        Text("—").tag(-1)
+                        ForEach(Array(result.headers.enumerated()), id: \.offset) { idx, h in
+                            Text(h).tag(idx)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+
+            // 预览表格
+            Table(result.rows.prefix(10).map { RowModel(values: $0) }) {
+                TableColumn("代码") { row in
+                    Text(row.value(at: result.mapping[.symbol]))
+                        .font(.callout.monospaced())
+                }
+                TableColumn("名称") { row in
+                    Text(row.value(at: result.mapping[.name]))
+                }
+                TableColumn("数量") { row in
+                    Text(row.value(at: result.mapping[.quantity]))
+                }
+                TableColumn("成本") { row in
+                    Text(row.value(at: result.mapping[.costBasis]))
+                }
+            }
+            .frame(height: 240)
+
+            Text("识别出 \(holdings.count) 条持仓（前 10 行预览）")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            HStack {
+                if isAIParsing {
+                    ProgressView(L10n.l("holdings.aiParsing"))
+                } else {
+                    Button {
+                        Task {
+                            isAIParsing = true
+                            let provider = app.aiSettings.provider
+                            let model = app.aiSettings.model
+                            let key = app.aiSettings.apiKey(for: provider)
+                            let ai = HoldingAIParser()
+                            if let url = sourceURL {
+                                let aiHoldings = await ai.parse(url: url, provider: provider, model: model, apiKey: key)
+                                if !aiHoldings.isEmpty {
+                                    holdings = aiHoldings
+                                }
+                            }
+                            isAIParsing = false
+                        }
+                    } label: {
+                        Label("AI 识别（兜底）", systemImage: "brain")
+                    }
+                }
+                Spacer()
+                Button(L10n.l("common.cancel")) { onConfirm([]) }
+                Button(L10n.l("common.import")) {
+                    onConfirm(holdings)
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(holdings.isEmpty)
+            }
+        }
+        .padding(20)
+        .frame(width: 760, height: 520)
+    }
+
+    struct RowModel: Identifiable {
+        let id = UUID()
+        let values: [String]
+        func value(at idx: Int?) -> String {
+            guard let idx, idx >= 0, idx < values.count else { return "" }
+            return values[idx]
+        }
+    }
+}
+
+// MARK: - JSON 持仓解析
+
+struct HoldingJSONParser {
+    func parse(_ text: String) -> [Holding] {
+        guard let data = text.data(using: .utf8) else { return [] }
+        // 支持单对象与数组
+        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return parseItems([obj])
+        }
+        if let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            return parseItems(arr)
+        }
+        return []
+    }
+
+    private func parseItems(_ items: [[String: Any]]) -> [Holding] {
+        var holdings: [Holding] = []
+        for item in items {
+            guard let code = (item["symbol"] as? String) ?? (item["ticker"] as? String) ?? (item["code"] as? String),
+                  let qty = (item["quantity"] as? Double) ?? (item["qty"] as? Double) ?? (item["shares"] as? Double)
+                    ?? RobustCSV.cleanNumber((item["quantity"] as? String) ?? ""),
+                  let cost = (item["cost"] as? Double) ?? (item["costBasis"] as? Double) ?? (item["price"] as? Double)
+                    ?? RobustCSV.cleanNumber((item["cost"] as? String) ?? ""),
+                  qty > 0 else { continue }
+            let market = Market(rawValue: (item["market"] as? String) ?? "") ?? RobustCSV.inferMarket(code)
+            let name = (item["name"] as? String) ?? code
+            let assetType = AssetType(rawValue: (item["assetType"] as? String) ?? "") ?? .stock
+            holdings.append(Holding(symbol: Symbol(market: market, code: code, name: name),
+                                    quantity: qty, costBasis: cost, broker: "JSON", assetType: assetType))
+        }
+        return holdings
     }
 }
 
@@ -339,85 +500,5 @@ struct HoldingAIParser {
             return up.hasPrefix("0") || up.hasPrefix("1") ? .fund : .cn
         }
         return .us
-    }
-}
-
-/// CSV/JSON 持仓解析（规则版；失败时由 AI 识别兜底）
-struct HoldingParser {
-    func parse(url: URL) -> [Holding] {
-        guard url.startAccessingSecurityScopedResource() else { return [] }
-        defer { url.stopAccessingSecurityScopedResource() }
-        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
-        if url.pathExtension.lowercased() == "json" {
-            return parseJSON(text)
-        }
-        return parseCSV(text)
-    }
-
-    private func parseCSV(_ text: String) -> [Holding] {
-        var rows = text.components(separatedBy: .newlines)
-        guard let headerLine = rows.first else { return [] }
-        rows.removeFirst()
-        let headers = headerLine.components(separatedBy: ",").map {
-            $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        }
-        guard let codeIdx = headers.firstIndex(where: { ["symbol", "ticker", "code", "证券代码"].contains($0) }),
-              let qtyIdx = headers.firstIndex(where: { ["quantity", "qty", "shares", "数量", "持仓数量"].contains($0) }),
-              let costIdx = headers.firstIndex(where: { ["cost", "cost_basis", "costbasis", "price", "成本价", "持仓成本"].contains($0) }) else {
-            return []
-        }
-        var holdings: [Holding] = []
-        for line in rows {
-            let cols = line.components(separatedBy: ",").map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            guard cols.count > max(codeIdx, qtyIdx, costIdx),
-                  !cols[codeIdx].isEmpty,
-                  let qty = Double(cols[qtyIdx]),
-                  let cost = Double(cols[costIdx]),
-                  qty > 0 else { continue }
-            let code = cols[codeIdx]
-            let (market, realCode) = inferMarket(code)
-            holdings.append(Holding(symbol: Symbol(market: market, code: realCode, name: realCode),
-                                    quantity: qty, costBasis: cost, broker: "CSV"))
-        }
-        return holdings
-    }
-
-    private func parseJSON(_ text: String) -> [Holding] {
-        guard let data = text.data(using: .utf8),
-              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            return []
-        }
-        var holdings: [Holding] = []
-        for item in arr {
-            guard let code = (item["symbol"] as? String) ?? (item["ticker"] as? String) ?? (item["code"] as? String),
-                  let qty = (item["quantity"] as? Double) ?? (item["qty"] as? Double) ?? (item["shares"] as? Double),
-                  let cost = (item["cost"] as? Double) ?? (item["costBasis"] as? Double) ?? (item["price"] as? Double),
-                  qty > 0 else { continue }
-            let (market, realCode) = inferMarket(code)
-            holdings.append(Holding(symbol: Symbol(market: market, code: realCode, name: realCode),
-                                    quantity: qty, costBasis: cost, broker: "JSON"))
-        }
-        return holdings
-    }
-
-    /// 从代码推断市场
-    private func inferMarket(_ code: String) -> (Market, String) {
-        let up = code.uppercased()
-        if up.hasSuffix(".HK") { return (.hk, up.replacingOccurrences(of: ".HK", with: "")) }
-        if up.hasSuffix(".T") || up.hasSuffix(".TSE") { return (.jp, up.replacingOccurrences(of: ".T", with: "").replacingOccurrences(of: ".TSE", with: "")) }
-        if up.hasSuffix(".KS") { return (.kr, up.replacingOccurrences(of: ".KS", with: "")) }
-        if up.hasSuffix(".TW") { return (.tw, up.replacingOccurrences(of: ".TW", with: "")) }
-        if up.hasSuffix(".SS") || up.hasSuffix(".SZ") {
-            let c = up.replacingOccurrences(of: ".SS", with: "").replacingOccurrences(of: ".SZ", with: "")
-            return (.cn, c)
-        }
-        if up.hasSuffix("USDT") || up.hasSuffix("USDC") || up.hasSuffix("BTC") { return (.crypto, up) }
-        if up.allSatisfy(\.isNumber), up.count == 6 {
-            if up.hasPrefix("0") || up.hasPrefix("1") { return (.fund, up) }
-            return (.cn, up)
-        }
-        return (.us, up)
     }
 }
