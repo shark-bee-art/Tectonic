@@ -1,6 +1,7 @@
 import Foundation
 
-public struct ChatMessage: Codable, Sendable, Equatable {
+public struct ChatMessage: Codable, Sendable, Equatable, Identifiable {
+    public var id: UUID = UUID()
     public let role: String   // system / user / assistant
     public let content: String
 
@@ -33,11 +34,13 @@ public struct ModelGateway: Sendable {
                      model: String,
                      apiKey: String? = nil,
                      temperature: Double = 0.7,
-                     maxTokens: Int = 2048) async throws -> String {
+                     maxTokens: Int = 2048,
+                     reasoningEffort: String? = nil) async throws -> String {
         if provider.usesOpenAICompat {
             return try await chatOpenAICompat(messages: messages, provider: provider,
                                               model: model, apiKey: apiKey,
-                                              temperature: temperature, maxTokens: maxTokens)
+                                              temperature: temperature, maxTokens: maxTokens,
+                                              reasoningEffort: reasoningEffort)
         }
         switch provider {
         case .ollama:
@@ -56,9 +59,11 @@ public struct ModelGateway: Sendable {
                     system: String = "你是一个专业的财经分析助手，回答使用简体中文，数据要注明来源与不确定性。",
                     provider: ModelProvider,
                     model: String,
-                    apiKey: String? = nil) async throws -> String {
+                    apiKey: String? = nil,
+                    reasoningEffort: String? = nil) async throws -> String {
         try await chat(messages: [.system(system), .user(userText)],
-                       provider: provider, model: model, apiKey: apiKey)
+                       provider: provider, model: model, apiKey: apiKey,
+                       reasoningEffort: reasoningEffort)
     }
 
     // MARK: - 新闻自动打标（结构化输出）
@@ -104,7 +109,8 @@ public struct ModelGateway: Sendable {
                                   model: String,
                                   apiKey: String?,
                                   temperature: Double,
-                                  maxTokens: Int) async throws -> String {
+                                  maxTokens: Int,
+                                  reasoningEffort: String? = nil) async throws -> String {
         guard let base = provider.presetBaseURL else {
             throw ModelGatewayError("\(provider.displayName) 缺少 baseURL")
         }
@@ -117,12 +123,16 @@ public struct ModelGateway: Sendable {
         if let key = apiKey, !key.isEmpty {
             request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         }
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "model": model,
             "messages": messages.map { ["role": $0.role, "content": $0.content] },
             "temperature": temperature,
             "max_tokens": maxTokens,
         ]
+        // 思考深度（OpenAI 兼容模型：o 系列 / DeepSeek 部分模型支持）
+        if let reasoningEffort, !reasoningEffort.isEmpty {
+            body["reasoning_effort"] = reasoningEffort
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {

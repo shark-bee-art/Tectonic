@@ -18,6 +18,8 @@ final class AppState: ObservableObject {
     @Published var selectedTab: SidebarItem = .watchlist
 
     @Published var isRefreshing = false
+    /// 右侧 AI 问询面板（nil = 关闭）
+    @Published var chatPanel: ChatPanelContext?
 
     enum SidebarItem: String, Hashable {
         case watchlist = "自选"

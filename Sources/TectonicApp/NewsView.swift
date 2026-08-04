@@ -159,15 +159,11 @@ struct TagChip: View {
     }
 }
 
-// MARK: - 资讯详情页（detail 列）：正文在上，模型对话框固定底部
+// MARK: - 资讯详情页（detail 列）：正文 + 右上 AI 问询（右侧面板）
 
 struct NewsDetailView: View {
     @EnvironmentObject var app: AppState
     let item: NewsItem
-
-    @State private var messages: [ChatMessage] = []
-    @State private var input = ""
-    @State private var isThinking = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -208,99 +204,48 @@ struct NewsDetailView: View {
                 .padding(16)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Divider()
-
-            // AI 对话区（固定底部）
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
+        }
+        .navigationTitle(L10n.l("sidebar.news"))
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    openChat()
+                } label: {
                     Label(L10n.l("news.aiChat"), systemImage: "brain")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if isThinking {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
                 }
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 6) {
-                            if messages.isEmpty {
-                                Text("就本条资讯提问：\n「这条消息对哪只股票影响最大？」\n「接下来行情可能怎么走？」")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            ForEach(Array(messages.enumerated()), id: \.offset) { _, msg in
-                                MessageBubble(message: msg)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                .frame(height: 120)
-                HStack(spacing: 6) {
-                    // 快捷问题（贴下沿，位于输入框上方）
-                    ForEach([(L10n.l("news.quickImpact"), "这条消息对哪只股票或市场影响最大？"),
-                             (L10n.l("news.quickOutlook"), "接下来行情可能怎么走？"),
-                             (L10n.l("news.quickRisk"), "有哪些风险点值得注意？")], id: \.0) { q in
-                        Button(q.0) {
-                            send(q.1)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(isThinking)
-                    }
-                    Spacer()
-                }
-                HStack(spacing: 6) {
-                    TextField("询问本条资讯…", text: $input)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit { send() }
-                    Button(L10n.l("common.send")) { send() }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)
-                }
+                .help(L10n.l("news.aiChat"))
             }
-            .padding(12)
-            .background(.bar)
         }
     }
 
-    private func send(_ preset: String? = nil) {
-        let text: String
-        if let preset {
-            text = preset
-        } else {
-            text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty, !isThinking else { return }
-        }
-        input = ""
-        guard !isThinking else { return }
-        let ai = app.aiSettings
-        let system = """
-        你是一个财经资讯分析助手。以下是用户正在阅读的资讯：
+    /// 打开右侧 AI 问询面板（正文作为上下文 + 可选联网资讯）
+    private func openChat() {
+        let item = self.item
+        let title = item.title
+        app.chatPanel = ChatPanelContext(
+            title: String(title.prefix(30)),
+            subtitle: L10n.l("placeholder.news"),
+            systemBuilder: { webContext in
+                var sys = """
+                你是一个财经资讯分析助手。以下是用户正在阅读的资讯：
 
-        标题：\(item.title)
-        \(item.content.map { "正文：\n\($0)" } ?? "摘要：\(item.summary)")
-        来源：\(item.source)，发布于 \(item.publishedAt.formatted())
+                标题：\(title)
+                \(item.content.map { "正文：\n\($0)" } ?? "摘要：\(item.summary)")
+                来源：\(item.source)，发布于 \(item.publishedAt.formatted())
 
-        用户会就这条资讯提问。\(app.settings.languageInstruction)
-        结合资讯内容与财经常识，明确指出不确定性和风险，不要给出确定性的投资建议。
-        """
-        messages.append(.user(text))
-        isThinking = true
-        Task {
-            defer { isThinking = false }
-            do {
-                let reply = try await ModelGateway().ask(
-                    text, system: system,
-                    provider: ai.provider, model: ai.model,
-                    apiKey: ai.apiKey(for: ai.provider))
-                messages.append(.assistant(reply))
-            } catch {
-                messages.append(.assistant("⚠️ 调用失败：\(error.localizedDescription)"))
-            }
-        }
+                用户会就这条资讯提问。\(app.settings.languageInstruction)
+                结合资讯内容与财经常识，明确指出不确定性和风险，不要给出确定性的投资建议。
+                """
+                if !webContext.isEmpty {
+                    sys += "\n\n以下是检索到的相关资讯（联网，请优先参考）：\n\(webContext)"
+                }
+                return sys
+            },
+            quickQuestions: [
+                (L10n.l("news.quickImpact"), "这条消息对哪只股票或市场影响最大？"),
+                (L10n.l("news.quickOutlook"), "接下来行情可能怎么走？"),
+                (L10n.l("news.quickRisk"), "有哪些风险点值得注意？"),
+            ]
+        )
     }
 }

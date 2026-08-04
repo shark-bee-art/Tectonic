@@ -50,6 +50,15 @@ struct ContentView: View {
                 PlaceholderView()
             }
         }
+        .overlay {
+            // 右侧 AI 问询面板
+            if let context = app.chatPanel {
+                ChatPanelView(context: context)
+                    .id(context.id)
+                    .zIndex(20)
+            }
+        }
+        .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if app.isRefreshing {

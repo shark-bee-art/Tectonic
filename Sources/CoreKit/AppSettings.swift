@@ -201,6 +201,14 @@ public final class AISettings: ObservableObject {
     @Published public var apiKeys: [String: String] {
         didSet { save() }
     }
+    /// 思考深度（low/medium/high）——传入模型 reasoning_effort
+    @Published public var reasoningEffort: String {
+        didSet { save() }
+    }
+    /// 联网搜索开关（问询前检索相关资讯注入上下文）
+    @Published public var webSearchEnabled: Bool {
+        didSet { save() }
+    }
 
     public init(defaults: UserDefaults = .standard) {
         let d = defaults
@@ -208,6 +216,8 @@ public final class AISettings: ObservableObject {
         provider = p
         model = d.string(forKey: "ai_model") ?? p.presetModel
         apiKeys = d.dictionary(forKey: "ai_api_keys") as? [String: String] ?? [:]
+        reasoningEffort = d.string(forKey: "ai_reasoning_effort") ?? "medium"
+        webSearchEnabled = d.object(forKey: "ai_web_search") as? Bool ?? false
     }
 
     public func apiKey(for provider: ModelProvider) -> String? {
@@ -229,5 +239,7 @@ public final class AISettings: ObservableObject {
         d.set(provider.rawValue, forKey: "ai_provider")
         d.set(model, forKey: "ai_model")
         d.set(apiKeys, forKey: "ai_api_keys")
+        d.set(reasoningEffort, forKey: "ai_reasoning_effort")
+        d.set(webSearchEnabled, forKey: "ai_web_search")
     }
 }

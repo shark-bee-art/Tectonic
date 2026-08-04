@@ -293,6 +293,22 @@ struct AISettingsTab: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section(L10n.l("chat.thinkDepth")) {
+                Picker(L10n.l("chat.thinkDepth"), selection: $ai.reasoningEffort) {
+                    Text(L10n.l("chat.effort.low")).tag("low")
+                    Text(L10n.l("chat.effort.medium")).tag("medium")
+                    Text(L10n.l("chat.effort.high")).tag("high")
+                }
+                .pickerStyle(.menu)
+                Text("低 = 快速回答；高 = 更深入的推理（更长响应时间）")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Toggle(L10n.l("chat.webSearch"), isOn: $ai.webSearchEnabled)
+                Text(L10n.l("chat.webSearchHint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("API Key（仅本地存储）") {
                 APIKeyRow(provider: ai.provider)
                     .environmentObject(ai)

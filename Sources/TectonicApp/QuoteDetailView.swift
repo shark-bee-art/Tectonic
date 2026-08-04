@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreKit
 
-/// 标的详情：行情概览 + 技术面数据 + AI 问询对话
+/// 标的详情：行情概览 + 技术面数据 + AI 问询（右侧面板）
 struct QuoteDetailView: View {
     @EnvironmentObject var app: AppState
     let symbol: Symbol
@@ -16,18 +16,61 @@ struct QuoteDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
                 technicalSection
-                aiChatSection
             }
             .padding(20)
         }
         .navigationTitle(symbol.name)
         .navigationSubtitle("\(symbol.code) · \(symbol.market.displayName)")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    openChat()
+                } label: {
+                    Label(L10n.l("detail.aiChat"), systemImage: "brain")
+                }
+                .help(L10n.l("detail.aiChat"))
+            }
+        }
         .task(id: symbol.id) {
             quote = await app.store.quote(for: symbol)
         }
         .task(id: "\(symbol.id)-tech") {
             await loadTechnical()
         }
+    }
+
+    /// 打开右侧 AI 问询面板（系统提示含行情 + 可选联网资讯）
+    private func openChat() {
+        let symbol = self.symbol
+        let name = symbol.name
+        let code = symbol.code
+        let marketName = symbol.market.displayName
+        app.chatPanel = ChatPanelContext(
+            title: "\(name)（\(code)）",
+            subtitle: L10n.l("placeholder.detail"),
+            systemBuilder: { webContext in
+                let quoteText: String
+                if let q = app.store.quotes[symbol.id] {
+                    quoteText = String(format: "现价 %.4f，涨跌 %+.2f%%（昨收 %.4f）", q.price, q.changePercent, q.prevClose)
+                } else {
+                    quoteText = "暂无实时行情数据"
+                }
+                var sys = """
+                你是专业的财经分析助手，分析标的是 \(name)（\(code)，\(marketName)）。
+                当前行情：\(quoteText)。
+                \(app.settings.languageInstruction) 基于公开信息分析，明确指出不确定性和风险，不要给出确定性的投资建议。
+                """
+                if !webContext.isEmpty {
+                    sys += "\n\n以下是检索到的相关资讯（联网，请优先参考）：\n\(webContext)"
+                }
+                return sys
+            },
+            quickQuestions: [
+                (L10n.l("detail.quickTrend"), "最近走势如何？技术面怎么看？"),
+                (L10n.l("detail.quickFundamental"), "基本面情况怎么样？关键财务指标如何？"),
+                (L10n.l("detail.quickNews"), "近期有哪些重要新闻？有什么风险点？"),
+            ]
+        )
     }
 
     // MARK: 头部行情
@@ -240,18 +283,6 @@ struct QuoteDetailView: View {
         }
     }
 
-    // MARK: AI 对话
-
-    private var aiChatSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("AI 分析")
-                .font(.headline)
-            SymbolChatView(symbol: symbol)
-        }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
-    }
-
     private func fmt(_ v: Double) -> String {
         v >= 100 ? String(format: "%.2f", v) : String(format: "%.4f", v)
     }
@@ -268,6 +299,7 @@ struct QuoteDetailView: View {
         return String(format: "%.0f", v)
     }
 }
+
 struct WatchlistToggle: View {
     @EnvironmentObject var app: AppState
     let symbol: Symbol
@@ -285,166 +317,12 @@ struct WatchlistToggle: View {
                 print("自选操作失败: \(error)")
             }
         } label: {
-            Label(inList ? "移出自选" : "添加自选",
+            Label(inList ? L10n.l("detail.removeWatchlist") : L10n.l("detail.addWatchlist"),
                   systemImage: inList ? "star.fill" : "star")
                 .foregroundStyle(inList ? Color.yellow : Color.accentColor)
         }
         .buttonStyle(.bordered)
         .symbolEffect(.bounce, value: inList)
-        .help(inList ? "移出自选" : "添加自选")
+        .help(inList ? L10n.l("detail.removeWatchlist") : L10n.l("detail.addWatchlist"))
     }
 }
-
-// MARK: - 标的 AI 对话
-
-struct SymbolChatView: View {
-    @EnvironmentObject var app: AppState
-    let symbol: Symbol
-
-    @State private var messages: [ChatMessage] = []
-    @State private var input = ""
-    @State private var isThinking = false
-
-    /// 快捷问题（点击直接发送）
-    private var quickQuestions: [(String, String)] {
-        [
-            ("走势如何", "最近走势如何？技术面怎么看？"),
-            ("基本面", "基本面情况怎么样？关键财务指标如何？"),
-            ("近期新闻", "近期有哪些重要新闻？有什么风险点？"),
-        ]
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        if messages.isEmpty {
-                            Text("针对 \(symbol.name)（\(symbol.code)）提问，例如：\n「最近走势如何？技术面怎么看？」\n「根据近期新闻，有什么风险点？」")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .padding(8)
-                        }
-                        ForEach(Array(messages.enumerated()), id: \.offset) { _, msg in
-                            MessageBubble(message: msg)
-                        }
-                        if isThinking {
-                            HStack(spacing: 6) {
-                                ProgressView().controlSize(.small)
-                                Text(L10n.l("common.thinking"))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(8)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(minHeight: 120, maxHeight: 220)
-            }
-
-            // 快捷问题按钮（贴下沿，位于输入框上方）
-            HStack(spacing: 8) {
-                ForEach(quickQuestions, id: \.0) { q in
-                    Button(q.0) {
-                        send(q.1)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isThinking)
-                }
-                Spacer()
-            }
-
-            HStack(spacing: 8) {
-                TextField("询问关于 \(symbol.name) 的问题…", text: $input)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { send() }
-                Button(L10n.l("common.send")) {
-                    send()
-                }
-                .keyboardShortcut(.defaultAction)
-                .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)
-            }
-        }
-    }
-
-    private func send(_ preset: String? = nil) {
-        let text: String
-        if let preset {
-            text = preset
-            input = ""
-        } else {
-            text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty, !isThinking else { return }
-            input = ""
-        }
-        guard !isThinking else { return }
-        let ai = app.aiSettings
-        let provider = ai.provider
-        let model = ai.model
-        let key = ai.apiKey(for: provider)
-
-        // 上下文：标的 + 行情 + 用户问题
-        let quoteText: String
-        if let q = app.store.quotes[symbol.id] {
-            quoteText = String(format: "现价 %.4f，涨跌 %+.2f%%（昨收 %.4f）",
-                               q.price, q.changePercent, q.prevClose)
-        } else {
-            quoteText = "暂无实时行情数据"
-        }
-        let system = """
-        你是专业的财经分析助手，分析标的是 \(symbol.name)（\(symbol.code)，\(symbol.market.displayName)）。
-        当前行情：\(quoteText)。
-        \(app.settings.languageInstruction) 基于公开信息分析，明确指出不确定性和风险，不要给出确定性的投资建议。
-        """
-        messages.append(.user(text))
-        isThinking = true
-        Task {
-            defer { isThinking = false }
-            do {
-                let reply = try await ModelGateway().ask(
-                    text, system: system,
-                    provider: provider, model: model, apiKey: key)
-                messages.append(.assistant(reply))
-            } catch {
-                messages.append(.assistant("⚠️ 调用失败：\(error.localizedDescription)"))
-            }
-        }
-    }
-}
-
-/// 消息气泡：宽度自适应界面（最大 520pt，文本自动换行）
-struct MessageBubble: View {
-    let message: ChatMessage
-
-    var body: some View {
-        HStack {
-            if message.role == "user" {
-                Spacer(minLength: 32)
-            }
-            Text(message.content)
-                .font(.callout)
-                .textSelection(.enabled)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: 520, alignment: message.role == "user" ? .trailing : .leading)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(message.role == "user"
-                              ? Color.accentColor.opacity(0.14)
-                              : Color.secondary.opacity(0.10))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(message.role == "user"
-                                      ? Color.accentColor.opacity(0.2)
-                                      : Color.secondary.opacity(0.15), lineWidth: 0.5)
-                )
-            if message.role == "assistant" {
-                Spacer(minLength: 32)
-            }
-        }
-    }
-}
-
