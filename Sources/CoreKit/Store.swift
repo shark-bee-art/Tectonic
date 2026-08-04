@@ -213,11 +213,22 @@ public final class Store: ObservableObject {
     public func importMissingBuiltinFeeds() throws -> Int {
         var added = 0
         try db.dbQueue.write { db in
+            // 清理不再支持的非 RSS 源（历史 API 源记录）
+            try NewsFeedRecord
+                .filter(Column("kind") != NewsFeedKind.rss.rawValue)
+                .deleteAll(db)
             for feed in NewsFeedCatalog.all {
-                let exists = try NewsFeedRecord
+                if let existing = try NewsFeedRecord
                     .filter(Column("url") == feed.url && Column("kind") == feed.kind.rawValue)
-                    .fetchCount(db) > 0
-                guard !exists else { continue }
+                    .fetchOne(db) {
+                    // 已存在：同步 enabled（以 catalog 为准，修复旧版默认关闭的源）
+                    if existing.enabled != feed.enabled {
+                        var updated = existing
+                        updated.enabled = feed.enabled
+                        try updated.update(db)
+                    }
+                    continue
+                }
                 var record = NewsFeedRecord(feed: feed)
                 try record.insert(db)
                 added += 1

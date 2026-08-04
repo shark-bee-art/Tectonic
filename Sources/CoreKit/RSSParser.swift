@@ -3,16 +3,23 @@ import Foundation
 /// 轻量 RSS/Atom 解析器（XMLParser 实现，无第三方依赖）
 public enum RSSParser {
 
-    /// 解析 RSS 源，返回新闻列表
+    /// 从 URL 拉取并解析 RSS 源
     public static func parse(url: URL, sourceName: String, limit: Int = 30) async throws -> [NewsItem] {
         var request = URLRequest(url: url)
         request.timeoutInterval = 20
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
                          forHTTPHeaderField: "User-Agent")
+        // 协商 gzip：URLSession 对带 Content-Encoding: gzip 的响应自动解压
+        request.setValue("gzip", forHTTPHeaderField: "Accept-Encoding")
         let (data, response) = try await URLSession.shared.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw NewsSourceError.parseFailed("RSS HTTP \(http.statusCode)")
         }
+        return try parse(data: data, sourceName: sourceName, limit: limit)
+    }
+
+    /// 解析 RSS/Atom 数据（支持 gzip 自动解压的 Data）
+    public static func parse(data: Data, sourceName: String, limit: Int = 30) throws -> [NewsItem] {
         let parser = RSSParserDelegate(sourceName: sourceName, limit: limit)
         let xmlParser = XMLParser(data: data)
         xmlParser.delegate = parser
