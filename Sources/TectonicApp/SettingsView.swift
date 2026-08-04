@@ -10,17 +10,63 @@ struct SettingsView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
+            GeneralSettingsTab()
+                .tabItem { Label(L10n.l("settings.generalTab"), systemImage: "gearshape") }
+                .tag("general")
             MarketSettingsTab()
-                .tabItem { Label("市场", systemImage: "chart.bar") }
+                .tabItem { Label(L10n.l("settings.marketTab"), systemImage: "chart.bar") }
                 .tag("market")
             AISettingsTab()
-                .tabItem { Label("AI 模型", systemImage: "brain") }
+                .tabItem { Label(L10n.l("settings.aiTab"), systemImage: "brain") }
                 .tag("ai")
             NewsSettingsTab()
-                .tabItem { Label("资讯源", systemImage: "newspaper") }
+                .tabItem { Label(L10n.l("settings.newsTab"), systemImage: "newspaper") }
                 .tag("news")
         }
         .padding(20)
+    }
+}
+
+// MARK: - 通用设置：界面语言 + 行情刷新频率
+
+struct GeneralSettingsTab: View {
+    @EnvironmentObject var app: AppState
+
+    var body: some View {
+        Form {
+            Section(L10n.l("settings.language")) {
+                Picker(L10n.l("settings.language"), selection: Binding(
+                    get: { app.settings.preferredLanguage },
+                    set: { app.settings.preferredLanguage = $0 }
+                )) {
+                    Text("中文").tag("zh")
+                    Text("English").tag("en")
+                    Text("日本語").tag("ja")
+                }
+                .pickerStyle(.menu)
+                Text(L10n.l("settings.languageHint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section(L10n.l("settings.refreshInterval")) {
+                Picker(L10n.l("settings.refreshInterval"), selection: Binding(
+                    get: { app.settings.refreshIntervalMinutes },
+                    set: { app.settings.refreshIntervalMinutes = $0 }
+                )) {
+                    Text("5 \(L10n.l("settings.minutes"))").tag(5)
+                    Text("10 \(L10n.l("settings.minutes"))").tag(10)
+                    Text("30 \(L10n.l("settings.minutes"))").tag(30)
+                    Text("1 \(L10n.l("settings.hour"))").tag(60)
+                }
+                .pickerStyle(.menu)
+                Text(L10n.l("settings.refreshIntervalHint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .padding(12)
     }
 }
 
@@ -224,7 +270,7 @@ struct AISettingsTab: View {
                 }
             }
 
-            Section("模型") {
+            Section(L10n.l("settings.model")) {
                 Picker("模型", selection: $modelSelection) {
                     ForEach(availableModels, id: \.self) { m in
                         Text(m).tag(Optional(m))
@@ -232,32 +278,17 @@ struct AISettingsTab: View {
                     if !availableModels.isEmpty {
                         Divider()
                     }
-                    Text("自定义模型…").tag(Optional("__custom__"))
+                    Text(L10n.l("settings.customModel")).tag(Optional("__custom__"))
                 }
                 .pickerStyle(.menu)
 
                 if showCustomModelField {
-                    TextField("自定义模型名称", text: $ai.model)
+                    TextField(L10n.l("settings.modelCustomField"), text: $ai.model)
                 }
 
                 Text(availableModels.isEmpty
-                     ? "模型列表加载中…"
-                     : "可选 \(availableModels.count) 个模型 · 每周自动更新")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("回答语言") {
-                Picker("首选语言", selection: Binding(
-                    get: { app.settings.preferredLanguage },
-                    set: { app.settings.preferredLanguage = $0 }
-                )) {
-                    Text("中文").tag("zh")
-                    Text("English").tag("en")
-                    Text("日本語").tag("ja")
-                }
-                .pickerStyle(.menu)
-                Text("AI 问询与资讯解读将使用该语言回复")
+                     ? L10n.l("common.loading")
+                     : "\(L10n.l("settings.modelUpdated")) · \(availableModels.count)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

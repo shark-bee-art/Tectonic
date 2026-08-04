@@ -21,6 +21,7 @@ public final class Store: ObservableObject {
         self.db = db
         try? reload()
         try? reloadFeeds()
+        try? reloadTrades()
     }
 
     // MARK: - 自选
@@ -164,6 +165,59 @@ public final class Store: ObservableObject {
             try HoldingRecord.deleteAll(db)
         }
         try reload()
+    }
+
+    // MARK: - 交易记录
+
+    @Published public private(set) var trades: [Trade] = []
+
+    public func reloadTrades() throws {
+        trades = try db.dbQueue.read { db in
+            try TradeRecord.order(Column("date").desc).fetchAll(db).map { $0.toTrade() }
+        }
+    }
+
+    /// 添加/更新交易记录
+    public func upsertTrade(_ tx: Trade) throws {
+        var record = TradeRecord(trade: tx)
+        try db.dbQueue.write { db in
+            try record.save(db)
+        }
+        try reloadTrades()
+    }
+
+    public func deleteTrade(_ tx: Trade) throws {
+        try db.dbQueue.write { db in
+            _ = try TradeRecord.deleteOne(db, key: tx.id)
+        }
+        try reloadTrades()
+    }
+
+    /// 从交易记录计算资产曲线（累计现金流：买入支出-, 卖出收入+，含手续费）
+    public func equityCurve() -> [(Date, Double)] {
+        var points: [(Date, Double)] = []
+        var equity: Double = 0
+        for tx in trades.sorted(by: { $0.date < $1.date }) {
+            let amount = abs(tx.netAmount)
+            let cash = tx.direction == "buy" ? -amount : amount
+            equity += cash
+            points.append((tx.date, equity))
+        }
+        return points
+    }
+
+    // MARK: - 持仓 → 自选
+
+    /// 一键导入自选（幂等），返回新增数量
+    @discardableResult
+    public func importHoldingsToWatchlist() throws -> Int {
+        var added = 0
+        for holding in holdings {
+            if try addToWatchlist(holding.symbol, group: L10n.l("sidebar.holdings")) {
+                added += 1
+            }
+        }
+        return added
     }
 
     // MARK: - 内置预置标的

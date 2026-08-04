@@ -27,6 +27,8 @@ struct ContentView: View {
                 NewsListView(category: .calendar)
             case .holdings:
                 HoldingsView()
+            case .transactions:
+                TransactionsView()
             }
         } detail: {
             switch app.selectedTab {
@@ -44,7 +46,7 @@ struct ContentView: View {
                 } else {
                     PlaceholderView()
                 }
-            case .holdings:
+            case .holdings, .transactions:
                 PlaceholderView()
             }
         }
@@ -78,25 +80,27 @@ struct SidebarView: View {
 
     var body: some View {
         List(selection: $app.selectedTab) {
-            Section("导航") {
-                Label("自选", systemImage: "star.fill")
+            Section(L10n.l("sidebar.navigation")) {
+                Label(L10n.l("sidebar.watchlist"), systemImage: "star.fill")
                     .tag(AppState.SidebarItem.watchlist)
-                Label("行情", systemImage: "chart.line.uptrend.xyaxis")
+                Label(L10n.l("sidebar.markets"), systemImage: "chart.line.uptrend.xyaxis")
                     .tag(AppState.SidebarItem.markets)
             }
-            Section("资讯") {
-                Label("快讯", systemImage: "bolt.fill")
+            Section(L10n.l("sidebar.news")) {
+                Label(L10n.l("sidebar.flash"), systemImage: "bolt.fill")
                     .tag(AppState.SidebarItem.newsFlash)
-                Label("研报", systemImage: "doc.text.magnifyingglass")
+                Label(L10n.l("sidebar.research"), systemImage: "doc.text.magnifyingglass")
                     .tag(AppState.SidebarItem.newsResearch)
-                Label("财报", systemImage: "chart.bar.doc.horizontal")
+                Label(L10n.l("sidebar.earnings"), systemImage: "chart.bar.doc.horizontal")
                     .tag(AppState.SidebarItem.newsEarnings)
-                Label("日历", systemImage: "calendar")
+                Label(L10n.l("sidebar.calendar"), systemImage: "calendar")
                     .tag(AppState.SidebarItem.newsCalendar)
             }
-            Section("资产") {
-                Label("持仓", systemImage: "briefcase")
+            Section(L10n.l("sidebar.assets")) {
+                Label(L10n.l("sidebar.holdings"), systemImage: "briefcase")
                     .tag(AppState.SidebarItem.holdings)
+                Label(L10n.l("sidebar.transactions"), systemImage: "list.bullet.rectangle")
+                    .tag(AppState.SidebarItem.transactions)
             }
         }
         .listStyle(.sidebar)

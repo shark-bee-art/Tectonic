@@ -316,18 +316,6 @@ struct SymbolChatView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 快捷问题按钮（并排）
-            HStack(spacing: 8) {
-                ForEach(quickQuestions, id: \.0) { q in
-                    Button(q.0) {
-                        send(q.1)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(isThinking)
-                }
-            }
-
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -343,7 +331,7 @@ struct SymbolChatView: View {
                         if isThinking {
                             HStack(spacing: 6) {
                                 ProgressView().controlSize(.small)
-                                Text("思考中…")
+                                Text(L10n.l("common.thinking"))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
@@ -355,11 +343,24 @@ struct SymbolChatView: View {
                 .frame(minHeight: 120, maxHeight: 220)
             }
 
+            // 快捷问题按钮（贴下沿，位于输入框上方）
+            HStack(spacing: 8) {
+                ForEach(quickQuestions, id: \.0) { q in
+                    Button(q.0) {
+                        send(q.1)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isThinking)
+                }
+                Spacer()
+            }
+
             HStack(spacing: 8) {
                 TextField("询问关于 \(symbol.name) 的问题…", text: $input)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { send() }
-                Button("发送") {
+                Button(L10n.l("common.send")) {
                     send()
                 }
                 .keyboardShortcut(.defaultAction)

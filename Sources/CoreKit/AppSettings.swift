@@ -23,8 +23,12 @@ public final class AppSettings: ObservableObject {
     @Published public var marketOrder: [Market] {
         didSet { save() }
     }
-    /// AI 首选语言（zh/en/ja）——影响 AI 回复语言
+    /// AI 首选语言（zh/en/ja）——整个应用的界面语言
     @Published public var preferredLanguage: String {
+        didSet { save() }
+    }
+    /// 行情自动刷新频率（分钟：5/10/30/60；0 表示仅手动刷新）
+    @Published public var refreshIntervalMinutes: Int {
         didSet { save() }
     }
 
@@ -44,11 +48,12 @@ public final class AppSettings: ObservableObject {
             marketOrder = Market.allCases
         }
         preferredLanguage = d.string(forKey: "preferred_language") ?? "zh"
+        refreshIntervalMinutes = d.object(forKey: "refresh_interval_minutes") as? Int ?? 5
     }
 
-    /// AI 回复语言指令（拼进 system prompt）
+    /// AI 回复语言指令（跟随全局界面语言）
     public var languageInstruction: String {
-        switch preferredLanguage {
+        switch L10n.currentLanguage {
         case "en": "Reply in English."
         case "ja": "日本語で回答してください。"
         default: "回答使用简体中文。"
@@ -102,6 +107,7 @@ public final class AppSettings: ObservableObject {
         d.set(try? encoder.encode(enabledMarkets), forKey: "market_enabled")
         d.set(try? encoder.encode(marketOrder), forKey: "market_order")
         d.set(preferredLanguage, forKey: "preferred_language")
+        d.set(refreshIntervalMinutes, forKey: "refresh_interval_minutes")
     }
 }
 

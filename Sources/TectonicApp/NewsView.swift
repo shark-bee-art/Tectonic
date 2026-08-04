@@ -214,19 +214,10 @@ struct NewsDetailView: View {
             // AI 对话区（固定底部）
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label("AI 问询", systemImage: "brain")
+                    Label(L10n.l("news.aiChat"), systemImage: "brain")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    // 快捷问题（并排）
-                    ForEach([("影响分析", "这条消息对哪只股票或市场影响最大？"), ("后续走势", "接下来行情可能怎么走？"), ("风险点", "有哪些风险点值得注意？")], id: \.0) { q in
-                        Button(q.0) {
-                            send(q.1)
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .disabled(isThinking)
-                    }
                     if isThinking {
                         ProgressView()
                             .controlSize(.small)
@@ -249,10 +240,24 @@ struct NewsDetailView: View {
                 }
                 .frame(height: 120)
                 HStack(spacing: 6) {
+                    // 快捷问题（贴下沿，位于输入框上方）
+                    ForEach([(L10n.l("news.quickImpact"), "这条消息对哪只股票或市场影响最大？"),
+                             (L10n.l("news.quickOutlook"), "接下来行情可能怎么走？"),
+                             (L10n.l("news.quickRisk"), "有哪些风险点值得注意？")], id: \.0) { q in
+                        Button(q.0) {
+                            send(q.1)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(isThinking)
+                    }
+                    Spacer()
+                }
+                HStack(spacing: 6) {
                     TextField("询问本条资讯…", text: $input)
                         .textFieldStyle(.roundedBorder)
                         .onSubmit { send() }
-                    Button("发送") { send() }
+                    Button(L10n.l("common.send")) { send() }
                         .keyboardShortcut(.defaultAction)
                         .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)
                 }

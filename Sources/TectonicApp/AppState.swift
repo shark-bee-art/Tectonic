@@ -27,6 +27,7 @@ final class AppState: ObservableObject {
         case newsEarnings = "财报"
         case newsCalendar = "日历"
         case holdings = "持仓"
+        case transactions = "交易记录"
     }
 
     init(db: AppDatabase) {
@@ -37,6 +38,13 @@ final class AppState: ObservableObject {
         store.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+        // 转发设置变化（语言/刷新频率切换后 UI 与定时器即时生效）
+        settings.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+                self?.startAutoRefresh()
             }
             .store(in: &cancellables)
     }
@@ -72,9 +80,12 @@ final class AppState: ObservableObject {
         startAutoRefresh()
     }
 
+    /// 按设置频率启动/重建自动刷新定时器（5/10/30/60 分钟；手动刷新随时可用）
     func startAutoRefresh() {
-        guard refreshTimer == nil else { return }
-        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        let minutes = max(settings.refreshIntervalMinutes, 5)
+        let timer = Timer(timeInterval: TimeInterval(minutes * 60), repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in await self?.refreshAll() }
         }
         RunLoop.main.add(timer, forMode: .common)

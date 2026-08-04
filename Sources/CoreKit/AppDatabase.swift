@@ -80,6 +80,27 @@ public final class AppDatabase: Sendable {
                 t.column("enabled", .boolean).notNull().defaults(to: true)
             }
         }
+        migrator.registerMigration("v5_transactions") { db in
+            try db.create(table: "transactions") { t in
+                t.primaryKey("id", .text)
+                t.column("date", .datetime).notNull()
+                t.column("asset_type", .text).notNull()
+                t.column("name", .text).notNull()
+                t.column("code", .text).notNull()
+                t.column("market", .text).notNull()
+                t.column("direction", .text).notNull()
+                t.column("quantity", .double).notNull()
+                t.column("price", .double).notNull()
+                t.column("fee", .double).notNull()
+                t.column("notes", .text).notNull()
+                t.column("option_json", .text)
+            }
+            // holdings 表扩展：资产类别 + 期权
+            try db.alter(table: "holdings") { t in
+                t.add(column: "asset_type", .text).defaults(to: "stock")
+                t.add(column: "option_json", .text)
+            }
+        }
         return migrator
     }
 }

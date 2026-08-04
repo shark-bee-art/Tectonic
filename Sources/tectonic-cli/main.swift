@@ -150,6 +150,39 @@ struct TectonicCLI {
                 exit(1)
             }
 
+        case "trades":
+            guard args.count >= 2 else { print("用法: trades list|add|delete"); exit(1) }
+            do {
+                let db = try AppDatabase.makeDefault()
+                let store = Store(db: db)
+                switch args[1] {
+                case "list":
+                    for t in store.trades {
+                        print("  \(t.date.formatted(date: .abbreviated, time: .omitted)) [\(t.direction)] \(t.name) \(t.code) × \(t.quantity) @ \(t.price) fee \(t.fee)")
+                    }
+                    print("共 \(store.trades.count) 笔")
+                case "add":
+                    guard args.count >= 8 else { print("用法: trades add <stock|bond|fund|currency|crypto|option|other> <code> <name> <buy|sell> <qty> <price> [fee]"); exit(1) }
+                    guard let type = AssetType(rawValue: args[2]),
+                          let qty = Double(args[6]), let price = Double(args[7]) else { print("参数错误"); exit(1) }
+                    let fee = args.count >= 9 ? (Double(args[8]) ?? 0) : 0
+                    let market = type.defaultMarket
+                    try store.upsertTrade(Trade(assetType: type, name: args[4], code: args[3].uppercased(),
+                                                market: market, direction: args[5], quantity: qty, price: price, fee: fee))
+                    print("已添加交易")
+                case "delete":
+                    guard args.count >= 3, let t = store.trades.first(where: { $0.id.hasPrefix(args[2]) }) else { print("未找到"); exit(1) }
+                    try store.deleteTrade(t)
+                    print("已删除")
+                default:
+                    print("未知子命令")
+                    exit(1)
+                }
+            } catch {
+                print("失败: \(error.localizedDescription)")
+                exit(1)
+            }
+
         case "ask":
             guard args.count >= 2 else { print("用法: ask <问题>"); exit(1) }
             let settings = AISettings()
