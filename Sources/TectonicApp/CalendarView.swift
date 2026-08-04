@@ -64,13 +64,6 @@ struct CalendarView: View {
             }
             .padding(16)
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(L10n.l("common.refresh")) {
-                    Task { await app.store.fetchCalendarEvents() }
-                }
-            }
-        }
     }
 
     private func daySection(day: String, events: [EconomicEvent]) -> some View {

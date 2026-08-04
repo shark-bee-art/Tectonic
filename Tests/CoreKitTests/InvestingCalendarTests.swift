@@ -23,6 +23,13 @@ final class InvestingCalendarTests: XCTestCase {
         let titles = events.map { $0.title }
         let known = titles.filter { $0.contains("CPI") || $0.contains("GDP") || $0.contains("PMI") || $0.contains("失业") || $0.contains("利率") }
         XCTAssertGreaterThan(known.count, 3, "应有 CPI/GDP/PMI 等指标，实际: \(known.prefix(8))")
+        // 数值列：实际/预测/前值至少有一部分有值（investing class 结构）
+        let withActual = events.filter { $0.actual != nil }
+        XCTAssertGreaterThan(withActual.count, 5, "实际值应有数据，样例: \(events.prefix(3).map { "\($0.title)=\($0.actual ?? "nil")" })")
+        // 首个事件应展示真实数值
+        let sample = events.first { $0.actual != nil }
+        XCTAssertNotNil(sample)
+        print("数值样例: \(sample!.title) 实际=\(sample!.actual!) 预测=\(sample!.forecast ?? "—") 前值=\(sample!.previous ?? "—")")
     }
 
     /// 时间解析（东八区）

@@ -98,9 +98,10 @@ public enum InvestingCalendarSource {
             guard !title.isEmpty else { continue }
             let country = extractAttribute(row, pattern: #"class="[^"]*flagCur[^"]*"[^>]*>\s*<span[^>]*title="([^"]+)""#) ?? ""
             let importance = detectImportance(row)
-            let actual: String? = extractText(row, pattern: #"data-test="actual"[^>]*>(.*?)</td>"#)
-            let forecast = extractText(row, pattern: #"data-test="forecast"[^>]*>(.*?)</td>"#)
-            let previous = extractText(row, pattern: #"data-test="previous"[^>]*>(.*?)</td>"#)
+            // 实际/预测/前值列：investing 用 class（无 data-test 属性）
+            let actual: String? = extractText(row, pattern: #"<td[^>]*class="[^"]*bold[^"]*act[^"]*"[^>]*>(.*?)</td>"#)
+            let forecast: String? = extractText(row, pattern: #"<td[^>]*class="[^"]*fore[^"]*"[^>]*>(.*?)</td>"#)
+            let previous: String? = extractText(row, pattern: #"<td[^>]*class="[^"]*prev[^"]*"[^>]*>(.*?)</td>"#)
 
             events.append(EconomicEvent(id: eventID, datetime: date, country: country, title: title,
                                         importance: importance,
