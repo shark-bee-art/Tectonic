@@ -218,6 +218,15 @@ struct NewsDetailView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
+                    // 快捷问题（并排）
+                    ForEach([("影响分析", "这条消息对哪只股票或市场影响最大？"), ("后续走势", "接下来行情可能怎么走？"), ("风险点", "有哪些风险点值得注意？")], id: \.0) { q in
+                        Button(q.0) {
+                            send(q.1)
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .disabled(isThinking)
+                    }
                     if isThinking {
                         ProgressView()
                             .controlSize(.small)
@@ -253,10 +262,16 @@ struct NewsDetailView: View {
         }
     }
 
-    private func send() {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isThinking else { return }
+    private func send(_ preset: String? = nil) {
+        let text: String
+        if let preset {
+            text = preset
+        } else {
+            text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, !isThinking else { return }
+        }
         input = ""
+        guard !isThinking else { return }
         let ai = app.aiSettings
         let system = """
         你是一个财经资讯分析助手。以下是用户正在阅读的资讯：
@@ -265,8 +280,8 @@ struct NewsDetailView: View {
         \(item.content.map { "正文：\n\($0)" } ?? "摘要：\(item.summary)")
         来源：\(item.source)，发布于 \(item.publishedAt.formatted())
 
-        用户会就这条资讯提问。回答使用简体中文，结合资讯内容与财经常识，
-        明确指出不确定性和风险，不要给出确定性的投资建议。
+        用户会就这条资讯提问。\(app.settings.languageInstruction)
+        结合资讯内容与财经常识，明确指出不确定性和风险，不要给出确定性的投资建议。
         """
         messages.append(.user(text))
         isThinking = true

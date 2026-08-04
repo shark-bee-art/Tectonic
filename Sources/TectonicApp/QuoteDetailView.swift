@@ -305,8 +305,29 @@ struct SymbolChatView: View {
     @State private var input = ""
     @State private var isThinking = false
 
+    /// 快捷问题（点击直接发送）
+    private var quickQuestions: [(String, String)] {
+        [
+            ("走势如何", "最近走势如何？技术面怎么看？"),
+            ("基本面", "基本面情况怎么样？关键财务指标如何？"),
+            ("近期新闻", "近期有哪些重要新闻？有什么风险点？"),
+        ]
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // 快捷问题按钮（并排）
+            HStack(spacing: 8) {
+                ForEach(quickQuestions, id: \.0) { q in
+                    Button(q.0) {
+                        send(q.1)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(isThinking)
+                }
+            }
+
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -347,10 +368,17 @@ struct SymbolChatView: View {
         }
     }
 
-    private func send() {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isThinking else { return }
-        input = ""
+    private func send(_ preset: String? = nil) {
+        let text: String
+        if let preset {
+            text = preset
+            input = ""
+        } else {
+            text = input.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, !isThinking else { return }
+            input = ""
+        }
+        guard !isThinking else { return }
         let ai = app.aiSettings
         let provider = ai.provider
         let model = ai.model
@@ -367,7 +395,7 @@ struct SymbolChatView: View {
         let system = """
         你是专业的财经分析助手，分析标的是 \(symbol.name)（\(symbol.code)，\(symbol.market.displayName)）。
         当前行情：\(quoteText)。
-        回答使用简体中文，基于公开信息分析，明确指出不确定性和风险，不要给出确定性的投资建议。
+        \(app.settings.languageInstruction) 基于公开信息分析，明确指出不确定性和风险，不要给出确定性的投资建议。
         """
         messages.append(.user(text))
         isThinking = true
@@ -385,26 +413,35 @@ struct SymbolChatView: View {
     }
 }
 
+/// 消息气泡：宽度自适应界面（最大 520pt，文本自动换行）
 struct MessageBubble: View {
     let message: ChatMessage
 
     var body: some View {
         HStack {
             if message.role == "user" {
-                Spacer(minLength: 40)
+                Spacer(minLength: 32)
             }
             Text(message.content)
                 .font(.callout)
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(message.role == "user"
-                              ? Color.accentColor.opacity(0.15)
-                              : Color.primary.opacity(0.06))
-                )
                 .textSelection(.enabled)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: 520, alignment: message.role == "user" ? .trailing : .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(message.role == "user"
+                              ? Color.accentColor.opacity(0.14)
+                              : Color.secondary.opacity(0.10))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(message.role == "user"
+                                      ? Color.accentColor.opacity(0.2)
+                                      : Color.secondary.opacity(0.15), lineWidth: 0.5)
+                )
             if message.role == "assistant" {
-                Spacer(minLength: 40)
+                Spacer(minLength: 32)
             }
         }
     }

@@ -148,7 +148,7 @@ struct MarketSettingsTab: View {
         VStack(alignment: .leading, spacing: 12) {
             Form {
                 Section {
-                    Text("选择要显示的市场，拖拽调整优先级（顶部优先）")
+                    Text("选择要显示的市场（按固定顺序展示）")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -172,47 +172,6 @@ struct MarketSettingsTab: View {
                 }
             }
             .formStyle(.grouped)
-
-            // 优先级排序：独立 List（Form 内的 List 拖拽不生效）
-            VStack(alignment: .leading, spacing: 4) {
-                Text("优先级（拖拽行或按钮调整）")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
-                List {
-                    ForEach(app.settings.marketOrder) { market in
-                        HStack {
-                            Image(systemName: "line.3.horizontal")
-                                .foregroundStyle(.tertiary)
-                            Text(market.displayName)
-                            Spacer()
-                            Button {
-                                app.settings.moveMarketUp(market)
-                            } label: {
-                                Image(systemName: "chevron.up")
-                            }
-                            .buttonStyle(.borderless)
-                            .disabled(app.settings.marketOrder.first == market)
-                            Button {
-                                app.settings.moveMarketDown(market)
-                            } label: {
-                                Image(systemName: "chevron.down")
-                            }
-                            .buttonStyle(.borderless)
-                            .disabled(app.settings.marketOrder.last == market)
-                            Text(market.currency)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 48)
-                        }
-                    }
-                    .onMove { from, to in
-                        app.settings.moveMarket(from: from, to: to)
-                    }
-                }
-                .listStyle(.inset)
-                .frame(height: CGFloat(app.settings.marketOrder.count) * 30 + 10)
-            }
 
             Divider()
 
@@ -284,6 +243,21 @@ struct AISettingsTab: View {
                 Text(availableModels.isEmpty
                      ? "模型列表加载中…"
                      : "可选 \(availableModels.count) 个模型 · 每周自动更新")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("回答语言") {
+                Picker("首选语言", selection: Binding(
+                    get: { app.settings.preferredLanguage },
+                    set: { app.settings.preferredLanguage = $0 }
+                )) {
+                    Text("中文").tag("zh")
+                    Text("English").tag("en")
+                    Text("日本語").tag("ja")
+                }
+                .pickerStyle(.menu)
+                Text("AI 问询与资讯解读将使用该语言回复")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

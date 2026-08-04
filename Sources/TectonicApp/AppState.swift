@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreKit
 import Observation
+import Combine
 
 /// 应用状态：Store + 设置 + 导航
 @MainActor
@@ -8,6 +9,8 @@ final class AppState: ObservableObject {
     let store: Store
     let settings: AppSettings
     let aiSettings: AISettings
+
+    private var cancellables: Set<AnyCancellable> = []
 
     // 导航
     @Published var selectedSymbol: Symbol?
@@ -30,6 +33,12 @@ final class AppState: ObservableObject {
         self.store = Store(db: db)
         self.settings = AppSettings()
         self.aiSettings = AISettings()
+        // 转发 Store 内部 @Published 变化（自选/行情/资讯源等），保证 UI 实时同步
+        store.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
     }
 
     // 行情自动刷新（60s）

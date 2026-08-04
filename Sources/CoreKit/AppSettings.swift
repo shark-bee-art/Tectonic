@@ -23,6 +23,10 @@ public final class AppSettings: ObservableObject {
     @Published public var marketOrder: [Market] {
         didSet { save() }
     }
+    /// AI 首选语言（zh/en/ja）——影响 AI 回复语言
+    @Published public var preferredLanguage: String {
+        didSet { save() }
+    }
 
     public init(defaults: UserDefaults = .standard) {
         let d = defaults
@@ -38,6 +42,16 @@ public final class AppSettings: ObservableObject {
             marketOrder = list
         } else {
             marketOrder = Market.allCases
+        }
+        preferredLanguage = d.string(forKey: "preferred_language") ?? "zh"
+    }
+
+    /// AI 回复语言指令（拼进 system prompt）
+    public var languageInstruction: String {
+        switch preferredLanguage {
+        case "en": "Reply in English."
+        case "ja": "日本語で回答してください。"
+        default: "回答使用简体中文。"
         }
     }
 
@@ -87,6 +101,7 @@ public final class AppSettings: ObservableObject {
         let d = UserDefaults.standard
         d.set(try? encoder.encode(enabledMarkets), forKey: "market_enabled")
         d.set(try? encoder.encode(marketOrder), forKey: "market_order")
+        d.set(preferredLanguage, forKey: "preferred_language")
     }
 }
 
