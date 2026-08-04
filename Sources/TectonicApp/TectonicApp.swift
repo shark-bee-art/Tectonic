@@ -12,7 +12,7 @@ struct TectonicApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
                 .environmentObject(appState)
                 .frame(minWidth: 1000, minHeight: 640)
         }

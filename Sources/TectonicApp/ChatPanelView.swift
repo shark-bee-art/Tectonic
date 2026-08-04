@@ -32,12 +32,14 @@ struct ChatPanelView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // 半透明遮罩（点击关闭）
-            Color.black.opacity(0.15)
-                .ignoresSafeArea()
+            // 透明点击区（点击面板外关闭）
+            Color.black.opacity(0.05)
+                .contentShape(Rectangle())
                 .onTapGesture { app.chatPanel = nil }
             panel
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+        .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
     }
 
@@ -52,17 +54,18 @@ struct ChatPanelView: View {
             inputArea
         }
         .frame(width: 430)
+        .frame(maxHeight: .infinity)
         .background(.regularMaterial)
-        .ignoresSafeArea(edges: .vertical)
+        .shadow(color: .black.opacity(0.2), radius: 24, x: -4, y: 0)
     }
 
     private var header: some View {
         HStack(spacing: 10) {
-            // 模型图标
-            RoundedRectangle(cornerRadius: 8)
+            // AI 标识（sparkles 渐变头像）
+            RoundedRectangle(cornerRadius: 9)
                 .fill(LinearGradient(colors: [.accentColor, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 30, height: 30)
-                .overlay(Image(systemName: "brain.head.profile").font(.system(size: 14)).foregroundStyle(.white))
+                .overlay(Image(systemName: "sparkles").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white))
             VStack(alignment: .leading, spacing: 2) {
                 Text(context.title)
                     .font(.headline)
@@ -144,10 +147,10 @@ struct ChatPanelView: View {
     private func chatBubble(_ msg: ChatMessage) -> some View {
         HStack(alignment: .top, spacing: 8) {
             if msg.role == "assistant" {
-                RoundedRectangle(cornerRadius: 6)
+                RoundedRectangle(cornerRadius: 7)
                     .fill(LinearGradient(colors: [.accentColor, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 24, height: 24)
-                    .overlay(Image(systemName: "brain.head.profile").font(.system(size: 11)).foregroundStyle(.white))
+                    .overlay(Image(systemName: "sparkles").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white))
             }
             VStack(alignment: .leading, spacing: 3) {
                 if msg.role == "assistant" {
@@ -177,10 +180,10 @@ struct ChatPanelView: View {
 
     private var thinkingIndicator: some View {
         HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: 7)
                 .fill(LinearGradient(colors: [.accentColor, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 24, height: 24)
-                .overlay(Image(systemName: "brain.head.profile").font(.system(size: 11)).foregroundStyle(.white))
+                .overlay(Image(systemName: "sparkles").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white))
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.l("common.thinking"))
                     .font(.caption2)
@@ -202,8 +205,8 @@ struct ChatPanelView: View {
 
     private var inputArea: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 快捷问题（贴输入框上方）
             HStack(spacing: 6) {
+                // 快捷问题（贴输入框上方）
                 ForEach(context.quickQuestions, id: \.0) { q in
                     Button {
                         send(q.1)
@@ -216,13 +219,42 @@ struct ChatPanelView: View {
                     .disabled(isThinking)
                 }
                 Spacer()
-                // 联网检索状态
-                if !searchedSources.isEmpty {
-                    Label("\(searchedSources.count)", systemImage: "globe")
-                        .font(.caption2)
-                        .foregroundStyle(.blue)
-                        .help(searchedSources.joined(separator: "\n"))
+                // 联网搜索快捷开关
+                Button {
+                    ai.webSearchEnabled.toggle()
+                } label: {
+                    Image(systemName: "globe")
+                        .font(.system(size: 12))
+                        .foregroundStyle(ai.webSearchEnabled ? Color.white : Color.secondary)
+                        .frame(width: 26, height: 22)
+                        .background(
+                            RoundedRectangle(cornerRadius: 7)
+                                .fill(ai.webSearchEnabled ? Color.blue : Color.secondary.opacity(0.12))
+                        )
                 }
+                .buttonStyle(.borderless)
+                .help(L10n.l("chat.webSearch"))
+                // 思考深度快捷开关（点击循环 低→中→高）
+                Button {
+                    switch ai.reasoningEffort {
+                    case "low": ai.reasoningEffort = "medium"
+                    case "medium": ai.reasoningEffort = "high"
+                    default: ai.reasoningEffort = "low"
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "dial.medium")
+                            .font(.system(size: 12))
+                        Text(reasoningLabel)
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .frame(height: 22)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.secondary.opacity(0.12)))
+                }
+                .buttonStyle(.borderless)
+                .help("\(L10n.l("chat.thinkDepth")): \(reasoningLabel)")
             }
             HStack(spacing: 8) {
                 TextField(context.subtitle, text: $input, axis: .vertical)
