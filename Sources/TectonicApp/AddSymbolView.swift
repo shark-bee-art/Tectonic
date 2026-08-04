@@ -17,7 +17,7 @@ struct AddSymbolButton: View {
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             AddSymbolPopover()
                 .environmentObject(app)
-                .frame(width: 420, height: 460)
+                .frame(width: 420)
         }
     }
 }
@@ -96,6 +96,7 @@ struct AddSymbolPopover: View {
                     }
                 }
                 .listStyle(.inset)
+                .frame(minHeight: 90, maxHeight: 260)
             } else {
                 Text("输入代码或名称开始搜索\n支持：AAPL、600519、00700.HK、BTCUSDT、110022、7203.T 等")
                     .font(.callout)
