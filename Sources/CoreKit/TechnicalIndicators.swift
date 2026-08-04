@@ -12,13 +12,29 @@ public struct TechnicalSummary: Codable, Sendable {
     public var high52w: Double?          // 52 周最高
     public var low52w: Double?           // 52 周最低
     public var avgVolume20: Double       // 20 日均量
+    public var rsi14: Double?            // RSI(14)
+    public var macdDIF: Double?          // MACD DIF（快线-慢线）
+    public var macdDEA: Double?          // MACD DEA（信号线）
+    public var macdHistogram: Double?    // MACD 柱（(DIF-DEA)×2）
+    public var bollUpper: Double?        // 布林上轨（MA20+2σ）
+    public var bollMid: Double?          // 布林中轨（MA20）
+    public var bollLower: Double?        // 布林下轨（MA20-2σ）
+    public var kdjK: Double?             // KDJ K
+    public var kdjD: Double?             // KDJ D
+    public var kdjJ: Double?             // KDJ J
+    public var rangePosition52w: Double? // 现价在 52 周区间位置 %（0-100）
     public var barCount: Int             // 参与计算的 K线数
     public var period: String            // 数据周期描述（如「日K · 251 根」）
 
     public init(currentPrice: Double, support: Double? = nil, resistance: Double? = nil,
                 sma20: Double? = nil, sma50: Double? = nil, sma200: Double? = nil,
                 ytdChangePercent: Double? = nil, high52w: Double? = nil, low52w: Double? = nil,
-                avgVolume20: Double = 0, barCount: Int = 0, period: String = "") {
+                avgVolume20: Double = 0, rsi14: Double? = nil,
+                macdDIF: Double? = nil, macdDEA: Double? = nil, macdHistogram: Double? = nil,
+                bollUpper: Double? = nil, bollMid: Double? = nil, bollLower: Double? = nil,
+                kdjK: Double? = nil, kdjD: Double? = nil, kdjJ: Double? = nil,
+                rangePosition52w: Double? = nil,
+                barCount: Int = 0, period: String = "") {
         self.currentPrice = currentPrice
         self.support = support
         self.resistance = resistance
@@ -29,6 +45,17 @@ public struct TechnicalSummary: Codable, Sendable {
         self.high52w = high52w
         self.low52w = low52w
         self.avgVolume20 = avgVolume20
+        self.rsi14 = rsi14
+        self.macdDIF = macdDIF
+        self.macdDEA = macdDEA
+        self.macdHistogram = macdHistogram
+        self.bollUpper = bollUpper
+        self.bollMid = bollMid
+        self.bollLower = bollLower
+        self.kdjK = kdjK
+        self.kdjD = kdjD
+        self.kdjJ = kdjJ
+        self.rangePosition52w = rangePosition52w
         self.barCount = barCount
         self.period = period
     }
@@ -55,6 +82,16 @@ public enum TechnicalAnalyzer {
 
         let (support, resistance) = supportResistance(sorted, currentPrice: price)
 
+        // 动量指标
+        let rsi14 = rsi(sorted, period: 14)
+        let (dif, dea, hist) = macd(sorted)
+        let (bollU, bollM, bollL) = bollinger(sorted, period: 20, multiplier: 2)
+        let (k, d, j) = kdj(sorted)
+        let rangePos: Double? = {
+            guard let h = high52w, let l = low52w, h > l else { return nil }
+            return (price - l) / (h - l) * 100
+        }()
+
         return TechnicalSummary(
             currentPrice: price,
             support: support,
@@ -66,6 +103,17 @@ public enum TechnicalAnalyzer {
             high52w: high52w,
             low52w: low52w,
             avgVolume20: avgVol,
+            rsi14: rsi14,
+            macdDIF: dif,
+            macdDEA: dea,
+            macdHistogram: hist,
+            bollUpper: bollU,
+            bollMid: bollM,
+            bollLower: bollL,
+            kdjK: k,
+            kdjD: d,
+            kdjJ: j,
+            rangePosition52w: rangePos,
             barCount: sorted.count,
             period: "日K · \(sorted.count) 根"
         )
@@ -92,6 +140,100 @@ public enum TechnicalAnalyzer {
         let base = firstOfYear.open
         guard base > 0 else { return nil }
         return (currentPrice - base) / base * 100
+    }
+
+    // MARK: - RSI（Wilder 平滑）
+
+    /// RSI：相对强弱指标，14 周期 Wilder 平滑
+    public static func rsi(_ bars: [KLineBar], period: Int = 14) -> Double? {
+        let closes = bars.map(\.close)
+        guard closes.count > period else { return nil }
+        var gains: Double = 0
+        var losses: Double = 0
+        for i in 1...period {
+            let diff = closes[i] - closes[i - 1]
+            if diff >= 0 { gains += diff } else { losses -= diff }
+        }
+        var avgGain = gains / Double(period)
+        var avgLoss = losses / Double(period)
+        for i in (period + 1)..<closes.count {
+            let diff = closes[i] - closes[i - 1]
+            avgGain = (avgGain * Double(period - 1) + max(diff, 0)) / Double(period)
+            avgLoss = (avgLoss * Double(period - 1) + max(-diff, 0)) / Double(period)
+        }
+        guard avgLoss > 0 else { return 100 }   // 全涨 → RSI 100
+        let rs = avgGain / avgLoss
+        return 100 - 100 / (1 + rs)
+    }
+
+    // MARK: - MACD（12, 26, 9）
+
+    /// MACD：DIF = EMA12 - EMA26；DEA = EMA9(DIF)；柱 = (DIF-DEA)×2
+    public static func macd(_ bars: [KLineBar]) -> (Double?, Double?, Double?) {
+        let closes = bars.map(\.close)
+        guard closes.count > 34 else { return (nil, nil, nil) }
+        let ema12 = ema(closes, period: 12)
+        let ema26 = ema(closes, period: 26)
+        let dif = ema12 - ema26
+        // DEA = EMA9 of DIF 序列
+        var difSeries: [Double] = []
+        // 重算 DIF 序列（从第 26 根起）
+        var e12 = closes[0], e26 = closes[0]
+        for (i, c) in closes.enumerated() {
+            if i > 0 {
+                e12 = e12 + 2.0 / 13.0 * (c - e12)
+                e26 = e26 + 2.0 / 27.0 * (c - e26)
+            }
+            if i >= 25 {
+                difSeries.append(e12 - e26)
+            }
+        }
+        let dea = difSeries.suffix(9).reduce(0, +) / 9
+        let hist = (dif - dea) * 2
+        return (dif, dea, hist)
+    }
+
+    /// EMA 序列最后一个值
+    private static func ema(_ values: [Double], period: Int) -> Double {
+        var result = values[0]
+        let k = 2.0 / Double(period + 1)
+        for v in values.dropFirst() {
+            result = result + k * (v - result)
+        }
+        return result
+    }
+
+    // MARK: - 布林带（20, 2σ）
+
+    /// BOLL：中轨 = MA20，上下轨 = MA20 ± 2×标准差
+    public static func bollinger(_ bars: [KLineBar], period: Int = 20, multiplier: Double = 2) -> (Double?, Double?, Double?) {
+        let window = bars.suffix(period).map(\.close)
+        guard window.count == period else { return (nil, nil, nil) }
+        let mean = window.reduce(0, +) / Double(period)
+        let variance = window.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(period)
+        let sd = variance.squareRoot()
+        return (mean + multiplier * sd, mean, mean - multiplier * sd)
+    }
+
+    // MARK: - KDJ（9, 3, 3）
+
+    /// KDJ：RSV = (C - L9)/(H9 - L9)×100；K = SMA(RSV,3)；D = SMA(K,3)；J = 3K - 2D
+    public static func kdj(_ bars: [KLineBar], period: Int = 9) -> (Double?, Double?, Double?) {
+        let n = bars.count
+        guard n > period + 3 else { return (nil, nil, nil) }
+        var k: Double = 50
+        var d: Double = 50
+        for i in (period - 1)..<n {
+            let window = bars[(i - period + 1)...i]
+            let high = window.map(\.high).max() ?? 0
+            let low = window.map(\.low).min() ?? 0
+            let close = bars[i].close
+            let rsv = high > low ? (close - low) / (high - low) * 100 : 50
+            k = (2.0 * k + rsv) / 3.0
+            d = (2.0 * d + k) / 3.0
+        }
+        let j = 3 * k - 2 * d
+        return (k, d, j)
     }
 
     // MARK: - 支撑/阻力（极值聚类）

@@ -164,4 +164,36 @@ public final class Store: ObservableObject {
         }
         try reload()
     }
+
+    // MARK: - 内置预置标的
+
+    /// 导入内置标的（幂等：已存在的跳过），返回新增数量
+    @discardableResult
+    public func importBuiltinSymbols() throws -> Int {
+        var added = 0
+        try db.dbQueue.write { db in
+            for symbol in BuiltinSymbols.all {
+                let item = WatchlistItem(symbol: symbol, group: "预置")
+                let exists = try WatchlistRecord.filter(Column("symbol_id") == item.symbol.id).fetchCount(db) > 0
+                guard !exists else { continue }
+                var record = WatchlistRecord(item: item)
+                try record.insert(db)
+                added += 1
+            }
+        }
+        try reload()
+        return added
+    }
+
+    /// 首启自动导入（UserDefaults 标志，失败重置下次重试）
+    @discardableResult
+    public func importBuiltinIfNeeded() throws -> Int {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: BuiltinSymbols.importedFlagKey) else { return 0 }
+        let added = try importBuiltinSymbols()
+        if added > 0 || BuiltinSymbols.all.isEmpty {
+            d.set(true, forKey: BuiltinSymbols.importedFlagKey)
+        }
+        return added
+    }
 }

@@ -81,6 +81,17 @@ struct TectonicCLI {
                 print("  支撑: \(t.support.map { fmt($0) } ?? "—")  阻力: \(t.resistance.map { fmt($0) } ?? "—")")
                 print("  MA20: \(t.sma20.map { fmt($0) } ?? "—")  MA50: \(t.sma50.map { fmt($0) } ?? "—")  MA200: \(t.sma200.map { fmt($0) } ?? "—")")
                 print("  YTD: \(t.ytdChangePercent.map { fmtPercent($0) } ?? "—")  52周高: \(t.high52w.map { fmt($0) } ?? "—")  52周低: \(t.low52w.map { fmt($0) } ?? "—")")
+                if let rsi = t.rsi14 { print("  RSI14: \(String(format: "%.1f", rsi))") }
+                if let dif = t.macdDIF, let dea = t.macdDEA, let hist = t.macdHistogram {
+                    print("  MACD: DIF \(String(format: "%.4f", dif))  DEA \(String(format: "%.4f", dea))  柱 \(String(format: "%.4f", hist))")
+                }
+                if let bu = t.bollUpper, let bm = t.bollMid, let bl = t.bollLower {
+                    print("  BOLL: 上 \(fmt(bu))  中 \(fmt(bm))  下 \(fmt(bl))")
+                }
+                if let k = t.kdjK, let d = t.kdjD, let j = t.kdjJ {
+                    print("  KDJ: K \(String(format: "%.1f", k))  D \(String(format: "%.1f", d))  J \(String(format: "%.1f", j))")
+                }
+                if let pos = t.rangePosition52w { print("  52周区间位置: \(String(format: "%.1f%%", pos))") }
                 if t.avgVolume20 > 0 { print("  20日均量: \(Int(t.avgVolume20))") }
             } catch {
                 print("失败: \(error.localizedDescription)")

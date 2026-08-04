@@ -109,10 +109,60 @@ struct QuoteDetailView: View {
                     HStack(spacing: 24) {
                         metricItem("年初至今", value: t.ytdChangePercent.map { fmtPercent($0) } ?? "—",
                                    color: (t.ytdChangePercent ?? 0) >= 0 ? Color.red : Color.green)
+                        if let pos = t.rangePosition52w {
+                            metricItem("52周区间位置", value: String(format: "%.0f%%", pos), color: nil)
+                        }
                         if t.avgVolume20 > 0 {
                             metricItem("20日均量", value: "\(shortNum(t.avgVolume20))", color: nil)
                         }
                         Spacer()
+                    }
+
+                    Divider()
+
+                    // 动量指标（RSI/MACD/KDJ/BOLL）
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("动量指标")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
+                            if let rsi = t.rsi14 {
+                                GridRow {
+                                    Text("RSI(14)").foregroundStyle(.secondary)
+                                    Text(String(format: "%.1f", rsi)).monospacedDigit()
+                                    Text(rsi >= 70 ? "超买" : (rsi <= 30 ? "超卖" : "中性"))
+                                        .font(.caption)
+                                        .foregroundStyle(rsi >= 70 ? Color.red : (rsi <= 30 ? Color.green : Color.secondary))
+                                }
+                            }
+                            if let dif = t.macdDIF, let dea = t.macdDEA, let hist = t.macdHistogram {
+                                GridRow {
+                                    Text("MACD").foregroundStyle(.secondary)
+                                    Text("DIF \(fmt(dif))  DEA \(fmt(dea))  柱 \(fmt(hist))").monospacedDigit()
+                                    Text(dif >= dea ? "多头" : "空头")
+                                        .font(.caption)
+                                        .foregroundStyle(dif >= dea ? Color.red : Color.green)
+                                }
+                            }
+                            if let bu = t.bollUpper, let bm = t.bollMid, let bl = t.bollLower {
+                                GridRow {
+                                    Text("布林带").foregroundStyle(.secondary)
+                                    Text("上 \(fmt(bu))  中 \(fmt(bm))  下 \(fmt(bl))").monospacedDigit()
+                                    Text(t.currentPrice > bu ? "突破上轨" : (t.currentPrice < bl ? "跌破下轨" : "通道内"))
+                                        .font(.caption)
+                                        .foregroundStyle(t.currentPrice > bu ? Color.red : (t.currentPrice < bl ? Color.green : Color.secondary))
+                                }
+                            }
+                            if let k = t.kdjK, let d = t.kdjD, let j = t.kdjJ {
+                                GridRow {
+                                    Text("KDJ").foregroundStyle(.secondary)
+                                    Text("K \(String(format: "%.1f", k))  D \(String(format: "%.1f", d))  J \(String(format: "%.1f", j))").monospacedDigit()
+                                    Text(k >= 80 ? "超买" : (k <= 20 ? "超卖" : "中性"))
+                                        .font(.caption)
+                                        .foregroundStyle(k >= 80 ? Color.red : (k <= 20 ? Color.green : Color.secondary))
+                                }
+                            }
+                        }
                     }
                 }
             }

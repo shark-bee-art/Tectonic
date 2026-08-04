@@ -121,4 +121,80 @@ final class TechnicalIndicatorsTests: XCTestCase {
         XCTAssertEqual(summary.currentPrice, 0)
         XCTAssertNil(summary.sma200)
     }
+
+    // MARK: - RSI
+
+    func testRSIAllUpIs100() {
+        // 全涨序列 → RSI 100
+        let bars = makeBars(count: 30, closes: (1...30).map { Double($0) })
+        XCTAssertEqual(TechnicalAnalyzer.rsi(bars) ?? 0, 100, accuracy: 0.001)
+    }
+
+    func testRSIAllDownIsNearZero() {
+        // 全跌序列 → RSI ≈ 0（损失平滑后略大于 0，但应 < 10）
+        let bars = makeBars(count: 30, closes: (1...30).map { Double(100 - $0) })
+        let rsi = TechnicalAnalyzer.rsi(bars) ?? 100
+        XCTAssertLessThan(rsi, 10)
+    }
+
+    func testRSIAlternating() {
+        // 涨跌交替 → RSI ≈ 50
+        var closes: [Double] = []
+        for i in 0..<60 { closes.append(Double(100 + (i % 2 == 0 ? 1 : -1))) }
+        let bars = makeBars(count: 60, closes: closes)
+        let rsi = TechnicalAnalyzer.rsi(bars) ?? 0
+        XCTAssertEqual(rsi, 50, accuracy: 10)
+    }
+
+    func testRSIInsufficientData() {
+        let bars = makeBars(count: 10, closes: (1...10).map { Double($0) })
+        XCTAssertNil(TechnicalAnalyzer.rsi(bars, period: 14))
+    }
+
+    // MARK: - BOLL
+
+    func testBollinger() {
+        // 恒定价格 → 标准差 0 → 上=中=下
+        let bars = makeBars(count: 30, closes: Array(repeating: 100.0, count: 30))
+        let (upper, mid, lower) = TechnicalAnalyzer.bollinger(bars)
+        XCTAssertEqual(mid ?? 0, 100, accuracy: 0.001)
+        XCTAssertEqual(upper ?? 0, 100, accuracy: 0.001)
+        XCTAssertEqual(lower ?? 0, 100, accuracy: 0.001)
+    }
+
+    func testBollingerSpread() {
+        // 波动序列 → 上 > 中 > 下
+        var closes: [Double] = []
+        for i in 0..<30 { closes.append(Double(100 + (i % 2 == 0 ? 10 : -10))) }
+        let bars = makeBars(count: 30, closes: closes)
+        let (upper, mid, lower) = TechnicalAnalyzer.bollinger(bars)
+        XCTAssertNotNil(upper)
+        XCTAssertNotNil(mid)
+        XCTAssertNotNil(lower)
+        XCTAssertGreaterThan(upper ?? 0, mid ?? 0)
+        XCTAssertGreaterThan(mid ?? 0, lower ?? 0)
+    }
+
+    // MARK: - KDJ
+
+    func testKDJRange() {
+        let bars = makeBars(count: 60, closes: (1...60).map { Double($0) })
+        let (k, d, _) = TechnicalAnalyzer.kdj(bars)
+        XCTAssertNotNil(k)
+        XCTAssertNotNil(d)
+        // 上涨趋势 → K 应处于高位（> 50）
+        XCTAssertGreaterThan(k ?? 0, 50)
+        XCTAssertLessThan(k ?? 0, 100)
+    }
+
+    // MARK: - 52周区间位置
+
+    func testRangePosition() {
+        // 前 130 根 100（低点）、中 60 根 200（高点）、后 70 根 150（现价）
+        // → 位置 = (150-100)/(200-100) = 50%
+        let closes = (1...260).map { $0 <= 130 ? 100.0 : ($0 <= 190 ? 200.0 : 150.0) }
+        let bars = makeBars(count: 260, closes: closes)
+        let summary = TechnicalAnalyzer.analyze(bars: bars)
+        XCTAssertEqual(summary.rangePosition52w ?? 0, 50, accuracy: 1)
+    }
 }

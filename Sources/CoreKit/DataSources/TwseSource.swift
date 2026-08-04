@@ -13,6 +13,10 @@ public struct TwseSource: MarketDataSource, Sendable {
         let code = symbol.code
             .replacingOccurrences(of: ".TW", with: "")
             .replacingOccurrences(of: ".tw", with: "")
+        // 非纯数字代码（如指数 TWII）快速失败，交给其他源
+        guard code.allSatisfy(\.isNumber) else {
+            throw DataSourceError.notSupported("TWSE 仅支持个股代码")
+        }
         let urlStr = "https://mis.twse.com.tw/stock/api/getStockInfo.jsp?ex_ch=tse_\(code).tw&json=1&delay=0"
         guard let url = URL(string: urlStr) else {
             throw DataSourceError.invalidURL(urlStr)

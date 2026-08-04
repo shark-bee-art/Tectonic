@@ -39,8 +39,15 @@ final class AppState: ObservableObject {
         await store.refreshQuotes()
     }
 
-    /// 首次启动自动刷一次 + 启动定时刷新
+    /// 首次启动自动刷一次 + 导入内置标的 + 启动定时刷新
     func onAppear() {
+        // 首启导入内置标的（幂等）
+        do {
+            let added = try store.importBuiltinIfNeeded()
+            if added > 0 { print("Tectonic: 已导入 \(added) 个内置标的") }
+        } catch {
+            print("Tectonic: 内置标的导入失败 \(error)")
+        }
         Task { await refreshAll() }
         startAutoRefresh()
     }

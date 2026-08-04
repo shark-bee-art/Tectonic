@@ -107,6 +107,7 @@ public final class MarketDataSourceRegistry: Sendable {
             EastMoneySearchSource(),
             TencentSource(),
             TwseSource(),
+            EastMoneyIndexSource(),
             YahooSource(),
             CoinGeckoSource(),
             BinanceSource(),

@@ -27,31 +27,40 @@ struct MarketSettingsTab: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
-        Form {
-            Section {
-                Text("选择要显示的市场，拖拽调整优先级（顶部优先）")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Section("显示开关") {
-                ForEach(Market.allCases) { market in
-                    Toggle(isOn: Binding(
-                        get: { app.settings.isEnabled(market) },
-                        set: { app.settings.setEnabled(market, enabled: $0) }
-                    )) {
-                        HStack {
-                            Image(systemName: marketIcon(market))
-                                .frame(width: 18)
-                            Text(market.displayName)
-                            Spacer()
-                            Text(market.tradingHours)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            Form {
+                Section {
+                    Text("选择要显示的市场，拖拽调整优先级（顶部优先）")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+                Section("显示开关") {
+                    ForEach(Market.allCases) { market in
+                        Toggle(isOn: Binding(
+                            get: { app.settings.isEnabled(market) },
+                            set: { app.settings.setEnabled(market, enabled: $0) }
+                        )) {
+                            HStack {
+                                Image(systemName: marketIcon(market))
+                                    .frame(width: 18)
+                                Text(market.displayName)
+                                Spacer()
+                                Text(market.tradingHours)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
             }
-            Section("优先级（拖拽或按钮排序）") {
+            .formStyle(.grouped)
+
+            // 优先级排序：独立 List（Form 内的 List 拖拽不生效）
+            VStack(alignment: .leading, spacing: 4) {
+                Text("优先级（拖拽行或按钮调整）")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
                 List {
                     ForEach(app.settings.marketOrder) { market in
                         HStack {
@@ -84,10 +93,17 @@ struct MarketSettingsTab: View {
                     }
                 }
                 .listStyle(.inset)
-                .frame(height: CGFloat(app.settings.marketOrder.count) * 32 + 16)
+                .frame(height: CGFloat(app.settings.marketOrder.count) * 30 + 10)
             }
+
+            Divider()
+
+            Button("恢复内置标的（\(BuiltinSymbols.all.count) 个）") {
+                try? app.store.importBuiltinSymbols()
+            }
+            .help("重新导入预置的常见标的（幂等，已存在的跳过）")
         }
-        .formStyle(.grouped)
+        .padding(12)
     }
 
     private func marketIcon(_ m: Market) -> String {

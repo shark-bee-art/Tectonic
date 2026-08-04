@@ -12,6 +12,10 @@ public struct TencentSource: MarketDataSource, Sendable {
     private func tencentCode(_ symbol: Symbol) -> String {
         switch symbol.market {
         case .cn:
+            // 支持显式前缀（sh000001 上证指数 / sz000001 平安银行 / sh510300 ETF）
+            if symbol.code.hasPrefix("sh") || symbol.code.hasPrefix("sz") {
+                return symbol.code
+            }
             // 6/9 开头沪市，其余深市
             if symbol.code.hasPrefix("6") || symbol.code.hasPrefix("9") {
                 return "sh\(symbol.code)"

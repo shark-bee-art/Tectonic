@@ -28,7 +28,7 @@ struct TectonicApp: App {
             SettingsView()
                 .environmentObject(appState)
                 .environmentObject(appState.aiSettings)
-                .frame(width: 620, height: 520)
+                .frame(width: 640, height: 620)
         }
     }
 }
