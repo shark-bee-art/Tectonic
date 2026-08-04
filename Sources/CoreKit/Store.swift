@@ -220,6 +220,34 @@ public final class Store: ObservableObject {
         return added
     }
 
+    // MARK: - 宏观经济日历（investing 爬虫源，30 分钟缓存防限流）
+
+    @Published public private(set) var calendarEvents: [EconomicEvent] = []
+    @Published public private(set) var calendarLoading = false
+    @Published public private(set) var calendarError: String?
+    private var calendarCacheTime: Date?
+
+    /// 拉取最近 N 天（含前后几天）的各国经济数据
+    public func fetchCalendarEvents() async {
+        calendarLoading = true
+        defer { calendarLoading = false }
+        // 30 分钟缓存
+        if let t = calendarCacheTime, Date().timeIntervalSince(t) < 30 * 60, !calendarEvents.isEmpty {
+            return
+        }
+        let now = Date()
+        let from = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
+        let to = Calendar.current.date(byAdding: .day, value: 9, to: now) ?? now
+        do {
+            let events = try await InvestingCalendarSource.fetch(from: from, to: to)
+            calendarEvents = events
+            calendarError = nil
+            calendarCacheTime = Date()
+        } catch {
+            calendarError = error.localizedDescription
+        }
+    }
+
     // MARK: - 内置预置标的
 
     /// 导入内置标的（幂等：已存在的跳过），返回新增数量

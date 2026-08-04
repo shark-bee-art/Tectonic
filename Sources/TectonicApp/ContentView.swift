@@ -24,7 +24,7 @@ struct ContentView: View {
             case .newsEarnings:
                 NewsListView(category: .earnings)
             case .newsCalendar:
-                NewsListView(category: .calendar)
+                CalendarView()
             case .holdings:
                 HoldingsView()
             case .transactions:
