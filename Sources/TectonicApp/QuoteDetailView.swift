@@ -287,7 +287,10 @@ struct WatchlistToggle: View {
         } label: {
             Label(inList ? "移出自选" : "添加自选",
                   systemImage: inList ? "star.fill" : "star")
+                .foregroundStyle(inList ? Color.yellow : Color.accentColor)
         }
+        .buttonStyle(.bordered)
+        .symbolEffect(.bounce, value: inList)
         .help(inList ? "移出自选" : "添加自选")
     }
 }

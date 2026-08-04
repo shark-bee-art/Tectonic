@@ -102,6 +102,38 @@ public struct HoldingRecord: Codable, FetchableRecord, MutablePersistableRecord 
     }
 }
 
+/// 新闻订阅源记录
+public struct NewsFeedRecord: Codable, FetchableRecord, MutablePersistableRecord {
+    public static let databaseTableName = "news_feeds"
+
+    public var id: String
+    public var name: String
+    public var category: String
+    public var kind: String
+    public var url: String
+    public var enabled: Bool
+
+    public init(feed: NewsFeed) {
+        self.id = feed.id
+        self.name = feed.name
+        self.category = feed.category.rawValue
+        self.kind = feed.kind.rawValue
+        self.url = feed.url
+        self.enabled = feed.enabled
+    }
+
+    public func toFeed() -> NewsFeed {
+        NewsFeed(id: id, name: name,
+                 category: NewsFeedCategory(rawValue: category) ?? .flash,
+                 kind: NewsFeedKind(rawValue: kind) ?? .rss,
+                 url: url, enabled: enabled)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, category, kind, url, enabled
+    }
+}
+
 /// 新闻表记录
 public struct NewsRecord: Codable, FetchableRecord, MutablePersistableRecord {
     public static let databaseTableName = "news"

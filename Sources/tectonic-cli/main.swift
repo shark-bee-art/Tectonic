@@ -120,6 +120,24 @@ struct TectonicCLI {
                 exit(1)
             }
 
+        case "news":
+            guard args.count >= 2 else { print("用法: news flash|research|earnings|calendar"); exit(1) }
+            guard let cat = NewsFeedCategory(rawValue: args[1]) else { print("分类: flash/research/earnings/calendar"); exit(1) }
+            do {
+                let db = try AppDatabase.makeDefault()
+                let store = Store(db: db)
+                try store.importBuiltinFeedsIfNeeded()
+                let items = await store.fetchNews(category: cat)
+                print("\(cat.displayName) 共 \(items.count) 条")
+                for item in items.prefix(10) {
+                    print("  [\(item.source)] \(item.publishedAt.formatted(date: .abbreviated, time: .shortened))")
+                    print("    \(item.title.prefix(60))")
+                }
+            } catch {
+                print("失败: \(error.localizedDescription)")
+                exit(1)
+            }
+
         case "ask":
             guard args.count >= 2 else { print("用法: ask <问题>"); exit(1) }
             let settings = AISettings()

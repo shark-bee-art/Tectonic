@@ -1,25 +1,58 @@
 import SwiftUI
 import CoreKit
 
-/// 资讯：新闻列表 → 详情（全文 + AI 对话 + 打标展示）
-struct NewsView: View {
+/// 资讯分类列表：快讯/研报/财报/日历 通用
+struct NewsListView: View {
     @EnvironmentObject var app: AppState
+    let category: NewsFeedCategory
+
+    @State private var items: [NewsItem] = []
     @State private var selectedNews: NewsItem?
+    @State private var isLoading = false
+    @State private var lastError: String?
+    @State private var refreshTick = 0
 
     var body: some View {
-        List(selection: $selectedNews) {
-            ForEach(app.store.news) { item in
-                NewsRow(item: item)
-                    .tag(item)
+        VStack(spacing: 0) {
+            // 顶部工具条（分类 + 刷新 + 最后刷新时间）
+            HStack {
+                Label(category.displayName, systemImage: category.icon)
+                    .font(.headline)
+                Spacer()
+                if let last = items.first?.publishedAt {
+                    Text("更新于 \(last.formatted(.relative(presentation: .named)))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Button {
+                    refreshTick += 1
+                } label: {
+                    Label("刷新", systemImage: "arrow.clockwise")
+                }
+                .disabled(isLoading)
             }
-        }
-        .overlay {
-            if app.store.news.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "newspaper")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.tertiary)
-                    Text("暂无资讯\n（P2 接入 RSS 订阅源后自动聚合）")
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            List(selection: $selectedNews) {
+                ForEach(items) { item in
+                    NewsRow(item: item)
+                        .tag(item)
+                }
+            }
+            .overlay {
+                if isLoading && items.isEmpty {
+                    ProgressView("加载中…")
+                } else if let lastError, items.isEmpty {
+                    VStack(spacing: 8) {
+                        Text(lastError)
+                            .foregroundStyle(.secondary)
+                        Button("重试") { refreshTick += 1 }
+                    }
+                } else if items.isEmpty {
+                    Text("暂无内容\n请在设置 → 资讯源中启用订阅源")
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
                 }
@@ -30,6 +63,21 @@ struct NewsView: View {
                 NewsReaderBar(item: item)
                     .frame(height: 300)
             }
+        }
+        .task(id: "\(category.rawValue)-\(refreshTick)") {
+            await load()
+        }
+    }
+
+    private func load() async {
+        isLoading = true
+        defer { isLoading = false }
+        items = await app.store.fetchNews(category: category)
+        lastError = nil
+        // 订阅源未导入时先导入再拉一次
+        if items.isEmpty, app.store.newsFeeds.isEmpty {
+            try? app.store.importBuiltinFeedsIfNeeded()
+            items = await app.store.fetchNews(category: category)
         }
     }
 }
@@ -58,7 +106,7 @@ struct NewsRow: View {
             }
             Text(item.title)
                 .font(.body.weight(.medium))
-                .lineLimit(2)
+                .lineLimit(3)
             if !item.summary.isEmpty {
                 Text(item.summary)
                     .font(.callout)
@@ -84,7 +132,7 @@ struct TagChip: View {
     }
 }
 
-// MARK: - 阅读页（底部条）：全文 + AI 对话 + 打标
+// MARK: - 阅读页（底部条）：正文 + AI 对话 + 打标
 
 struct NewsReaderBar: View {
     @EnvironmentObject var app: AppState

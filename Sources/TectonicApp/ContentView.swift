@@ -17,8 +17,14 @@ struct ContentView: View {
                 WatchlistView()
             case .markets:
                 MarketsView()
-            case .news:
-                NewsView()
+            case .newsFlash:
+                NewsListView(category: .flash)
+            case .newsResearch:
+                NewsListView(category: .research)
+            case .newsEarnings:
+                NewsListView(category: .earnings)
+            case .newsCalendar:
+                NewsListView(category: .calendar)
             case .holdings:
                 HoldingsView()
             }
@@ -64,8 +70,18 @@ struct SidebarView: View {
                     .tag(AppState.SidebarItem.watchlist)
                 Label("行情", systemImage: "chart.line.uptrend.xyaxis")
                     .tag(AppState.SidebarItem.markets)
-                Label("资讯", systemImage: "newspaper")
-                    .tag(AppState.SidebarItem.news)
+            }
+            Section("资讯") {
+                Label("快讯", systemImage: "bolt.fill")
+                    .tag(AppState.SidebarItem.newsFlash)
+                Label("研报", systemImage: "doc.text.magnifyingglass")
+                    .tag(AppState.SidebarItem.newsResearch)
+                Label("财报", systemImage: "chart.bar.doc.horizontal")
+                    .tag(AppState.SidebarItem.newsEarnings)
+                Label("日历", systemImage: "calendar")
+                    .tag(AppState.SidebarItem.newsCalendar)
+            }
+            Section("资产") {
                 Label("持仓", systemImage: "briefcase")
                     .tag(AppState.SidebarItem.holdings)
             }

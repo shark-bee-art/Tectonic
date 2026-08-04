@@ -20,6 +20,7 @@ public final class Store: ObservableObject {
     public init(db: AppDatabase) {
         self.db = db
         try? reload()
+        try? reloadFeeds()
     }
 
     // MARK: - 自选
@@ -195,5 +196,95 @@ public final class Store: ObservableObject {
             d.set(true, forKey: BuiltinSymbols.importedFlagKey)
         }
         return added
+    }
+
+    // MARK: - 资讯订阅源
+
+    @Published public private(set) var newsFeeds: [NewsFeed] = []
+
+    public func reloadFeeds() throws {
+        newsFeeds = try db.dbQueue.read { db in
+            try NewsFeedRecord.order(Column("category"), Column("name")).fetchAll(db).map { $0.toFeed() }
+        }
+    }
+
+    /// 强制补全缺失的预置订阅源（供「恢复预置」按钮使用，不受首启标志限制）
+    @discardableResult
+    public func importMissingBuiltinFeeds() throws -> Int {
+        var added = 0
+        try db.dbQueue.write { db in
+            for feed in NewsFeedCatalog.all {
+                let exists = try NewsFeedRecord
+                    .filter(Column("url") == feed.url && Column("kind") == feed.kind.rawValue)
+                    .fetchCount(db) > 0
+                guard !exists else { continue }
+                var record = NewsFeedRecord(feed: feed)
+                try record.insert(db)
+                added += 1
+            }
+        }
+        try reloadFeeds()
+        return added
+    }
+
+    /// 首启导入预置订阅源（幂等，按 url+kind 查重）
+    @discardableResult
+    public func importBuiltinFeedsIfNeeded() throws -> Int {
+        let d = UserDefaults.standard
+        guard !d.bool(forKey: NewsFeedCatalog.importedFlagKey) else { return 0 }
+        let added = try importMissingBuiltinFeeds()
+        d.set(true, forKey: NewsFeedCatalog.importedFlagKey)
+        return added
+    }
+
+    /// 启停订阅源
+    public func setFeedEnabled(_ feed: NewsFeed, enabled: Bool) throws {
+        try db.dbQueue.write { db in
+            guard var record = try NewsFeedRecord.fetchOne(db, key: feed.id) else { return }
+            record.enabled = enabled
+            try record.update(db)
+        }
+        try reloadFeeds()
+    }
+
+    /// 添加自定义 RSS 订阅源
+    @discardableResult
+    public func addRSSFeed(name: String, url: String, category: NewsFeedCategory) throws -> Bool {
+        var record = NewsFeedRecord(feed: NewsFeed(name: name, category: category, kind: .rss, url: url))
+        try db.dbQueue.write { db in
+            let exists = try NewsFeedRecord.filter(Column("url") == url).fetchCount(db) > 0
+            guard !exists else { return }
+            try record.insert(db)
+        }
+        try reloadFeeds()
+        return true
+    }
+
+    public func removeFeed(_ feed: NewsFeed) throws {
+        try db.dbQueue.write { db in
+            _ = try NewsFeedRecord.deleteOne(db, key: feed.id)
+        }
+        try reloadFeeds()
+    }
+
+    /// 拉取某分类下所有启用源的资讯（合并按时间排序）
+    public func fetchNews(category: NewsFeedCategory) async -> [NewsItem] {
+        let feeds = newsFeeds.filter { $0.category == category && $0.enabled }
+        guard !feeds.isEmpty else { return [] }
+        var all: [NewsItem] = []
+        await withTaskGroup(of: [NewsItem].self) { group in
+            for feed in feeds {
+                group.addTask {
+                    (try? await NewsSourceRegistry.fetch(feed: feed, limit: 20)) ?? []
+                }
+            }
+            for await items in group {
+                all.append(contentsOf: items)
+            }
+        }
+        // 去重（按 id）+ 时间倒序
+        var seen: Set<String> = []
+        let deduped = all.filter { seen.insert($0.id).inserted }
+        return deduped.sorted { $0.publishedAt > $1.publishedAt }
     }
 }

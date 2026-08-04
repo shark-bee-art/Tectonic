@@ -31,11 +31,20 @@ struct AddSymbolPopover: View {
     @State private var isSearching = false
     @State private var selectedMarket: Market? = nil
     @State private var groupName = "默认分组"
+    @State private var addedMessage: String?
+    @State private var lastAdded: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("添加标的")
                 .font(.headline)
+
+            if let msg = addedMessage {
+                Label(msg, systemImage: "checkmark.circle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.green)
+                    .transition(.opacity)
+            }
 
             HStack(spacing: 8) {
                 Picker("市场", selection: $selectedMarket) {
@@ -70,13 +79,19 @@ struct AddSymbolPopover: View {
                         }
                         Spacer()
                         if app.store.isInWatchlist(symbol) {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.secondary)
+                            Label("已添加", systemImage: "checkmark.circle.fill")
+                                .font(.callout)
+                                .foregroundStyle(.green)
+                        } else if lastAdded == symbol.id {
+                            Label("已添加", systemImage: "checkmark.circle.fill")
+                                .font(.callout)
+                                .foregroundStyle(.green)
                         } else {
                             Button("添加") {
                                 add(symbol)
                             }
                             .controlSize(.small)
+                            .buttonStyle(.borderedProminent)
                         }
                     }
                 }
@@ -104,6 +119,8 @@ struct AddSymbolPopover: View {
         guard !q.isEmpty else { return }
         isSearching = true
         results = []
+        lastAdded = nil
+        addedMessage = nil
         Task {
             defer { isSearching = false }
             results = await app.store.search(query: q, market: selectedMarket)
@@ -137,12 +154,27 @@ struct AddSymbolPopover: View {
     }
 
     private func add(_ symbol: Symbol) {
+        let group = groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "默认分组" : groupName.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            try app.store.addToWatchlist(symbol, group: groupName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                         ? "默认分组"
-                                         : groupName.trimmingCharacters(in: .whitespacesAndNewlines))
+            let added = try app.store.addToWatchlist(symbol, group: group)
+            if added {
+                lastAdded = symbol.id
+                withAnimation {
+                    addedMessage = "已添加 \(symbol.name)（\(symbol.code)）到「\(group)」"
+                }
+            } else {
+                withAnimation {
+                    addedMessage = "\(symbol.name) 已在自选中"
+                }
+            }
+            // 消息 2.5 秒后消失
+            Task {
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                withAnimation { addedMessage = nil }
+            }
         } catch {
-            print("添加失败: \(error)")
+            addedMessage = "添加失败：\(error.localizedDescription)"
         }
     }
 }

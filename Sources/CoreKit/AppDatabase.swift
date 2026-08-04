@@ -70,6 +70,16 @@ public final class AppDatabase: Sendable {
                 t.column("imported_at", .datetime).notNull()
             }
         }
+        migrator.registerMigration("v4_news_feeds") { db in
+            try db.create(table: "news_feeds") { t in
+                t.primaryKey("id", .text)
+                t.column("name", .text).notNull()
+                t.column("category", .text).notNull()
+                t.column("kind", .text).notNull()
+                t.column("url", .text).notNull()
+                t.column("enabled", .boolean).notNull().defaults(to: true)
+            }
+        }
         return migrator
     }
 }

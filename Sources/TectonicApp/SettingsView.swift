@@ -16,8 +16,126 @@ struct SettingsView: View {
             AISettingsTab()
                 .tabItem { Label("AI 模型", systemImage: "brain") }
                 .tag("ai")
+            NewsSettingsTab()
+                .tabItem { Label("资讯源", systemImage: "newspaper") }
+                .tag("news")
         }
         .padding(20)
+    }
+}
+
+// MARK: - 资讯源设置：订阅源启停 + 添加自定义 RSS
+
+struct NewsSettingsTab: View {
+    @EnvironmentObject var app: AppState
+
+    @State private var newName = ""
+    @State private var newURL = ""
+    @State private var newCategory: NewsFeedCategory = .flash
+    @State private var addMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Form {
+                ForEach(NewsFeedCategory.allCases) { category in
+                    Section(category.displayName) {
+                        let feeds = app.store.newsFeeds.filter { $0.category == category }
+                        if feeds.isEmpty {
+                            Text("无订阅源（可在下方添加）")
+                                .font(.callout)
+                                .foregroundStyle(.tertiary)
+                        }
+                        ForEach(feeds, id: \.id) { feed in
+                            HStack {
+                                Toggle("", isOn: Binding(
+                                    get: { feed.enabled },
+                                    set: { try? app.store.setFeedEnabled(feed, enabled: $0) }
+                                ))
+                                .labelsHidden()
+                                Text(feed.name)
+                                Spacer()
+                                Text(feed.kind == .rss ? "RSS" : feed.kind.rawValue)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Button {
+                                    try? app.store.removeFeed(feed)
+                                } label: {
+                                    Image(systemName: "xmark.circle")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.borderless)
+                                .help("删除订阅源")
+                            }
+                        }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+
+            Divider()
+
+            // 添加自定义 RSS
+            VStack(alignment: .leading, spacing: 8) {
+                Text("添加自定义 RSS 订阅源")
+                    .font(.headline)
+                if let msg = addMessage {
+                    Text(msg)
+                        .font(.callout)
+                        .foregroundStyle(msg.hasPrefix("已添加") ? Color.green : Color.red)
+                }
+                HStack(spacing: 8) {
+                    TextField("名称（如：日经中文网）", text: $newName)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+                    TextField("RSS 地址（https://…）", text: $newURL)
+                        .textFieldStyle(.roundedBorder)
+                    Picker("分类", selection: $newCategory) {
+                        ForEach(NewsFeedCategory.allCases) { c in
+                            Text(c.displayName).tag(c)
+                        }
+                    }
+                    .frame(width: 100)
+                    Button("添加") { addFeed() }
+                        .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                  || newURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                Text("支持任意 RSS 2.0 / Atom 订阅源；添加后会立即验证可解析")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+
+            Button("恢复预置订阅源（\(NewsFeedCatalog.all.count) 个）") {
+                _ = try? app.store.importMissingBuiltinFeeds()
+                addMessage = nil
+            }
+        }
+        .padding(12)
+    }
+
+    private func addFeed() {
+        let name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let url = newURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !url.isEmpty, let u = URL(string: url), u.scheme != nil else {
+            addMessage = "名称或地址无效"
+            return
+        }
+        // 先验证 RSS 可解析
+        Task {
+            do {
+                let items = try await RSSParser.parse(url: u, sourceName: name, limit: 1)
+                guard !items.isEmpty else {
+                    addMessage = "该地址不是有效的 RSS 源（无内容）"
+                    return
+                }
+                try app.store.addRSSFeed(name: name, url: url, category: newCategory)
+                newName = ""
+                newURL = ""
+                addMessage = "已添加 \(name)（验证通过，抓到 \(items.count) 条）"
+            } catch {
+                addMessage = "解析失败：\(error.localizedDescription)"
+            }
+        }
     }
 }
 
