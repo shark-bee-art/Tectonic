@@ -1,0 +1,14 @@
+# Swift
+.build/
+.swiftpm/
+DerivedData/
+
+# macOS
+.DS_Store
+
+# Local dev notes — never commit
+Notes/
+
+# Xcode user state
+*.xcuserstate
+xcuserdata/
