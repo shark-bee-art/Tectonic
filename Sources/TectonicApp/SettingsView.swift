@@ -245,6 +245,11 @@ struct MarketSettingsTab: View {
 
 // MARK: - AI 设置：供应商（分组行列表）+ 模型（下拉）+ Key（本地存储）
 
+/// 搜索服务商下拉文案
+private func providerLabel(_ p: SearchProvider) -> String {
+    "\(p.displayName)（\(p.freeTier)）"
+}
+
 struct AISettingsTab: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var ai: AISettings
@@ -293,20 +298,34 @@ struct AISettingsTab: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section(L10n.l("chat.thinkDepth")) {
-                Picker(L10n.l("chat.thinkDepth"), selection: $ai.reasoningEffort) {
-                    Text(L10n.l("chat.effort.low")).tag("low")
-                    Text(L10n.l("chat.effort.medium")).tag("medium")
-                    Text(L10n.l("chat.effort.high")).tag("high")
+            Section(L10n.l("chat.webSearch")) {
+                Picker("搜索服务商", selection: Binding(
+                    get: { app.settings.searchProvider },
+                    set: { app.settings.searchProvider = $0 }
+                )) {
+                    ForEach(SearchProvider.allCases) { p in
+                        Text(providerLabel(p)).tag(p)
+                    }
                 }
                 .pickerStyle(.menu)
-                Text("低 = 快速回答；高 = 更深入的推理（更长响应时间）")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Toggle(L10n.l("chat.webSearch"), isOn: $ai.webSearchEnabled)
-                Text(L10n.l("chat.webSearchHint"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                SecureField("API Key（官网申请）", text: Binding(
+                    get: { app.settings.searchAPIKey },
+                    set: { app.settings.searchAPIKey = $0 }
+                ))
+                HStack {
+                    Text(app.settings.searchAPIKey.isEmpty
+                         ? "未配置 → 自动回退内置资讯源检索"
+                         : "已配置 → 问询前联网检索")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("去官网申请") {
+                        if let url = URL(string: app.settings.searchProvider.signupURL) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .controlSize(.small)
+                }
             }
 
             Section("API Key（仅本地存储）") {

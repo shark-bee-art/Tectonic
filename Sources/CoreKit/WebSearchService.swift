@@ -1,7 +1,8 @@
 import Foundation
 
 // MARK: - 联网搜索服务（AI 问询的联网能力）
-// 方案：从内置 RSS 资讯源检索相关新闻（免费/无 key/财经相关）+ Wikipedia 通用知识兜底
+// 主通道：用户自备搜索 API Key（Brave/Serper/Tavily，官网申请，同大模型提供商模式）
+// 兜底：内置 RSS 资讯源关键词检索 + Wikipedia
 
 public struct WebSearchResult: Sendable {
     public var title: String
@@ -12,8 +13,106 @@ public struct WebSearchResult: Sendable {
 
 public enum WebSearchService {
 
-    /// 检索与问题相关的资讯（并发抓取启用源 RSS，标题/摘要关键词匹配）
-    public static func search(query: String, feeds: [NewsFeed], limit: Int = 6) async -> [WebSearchResult] {
+    /// 联网搜索主入口：配置了 API Key 走搜索服务商；否则回退 RSS 检索
+    public static func search(query: String, feeds: [NewsFeed],
+                              provider: SearchProvider, apiKey: String) async -> [WebSearchResult] {
+        if !apiKey.isEmpty {
+            if let results = await searchAPI(query: query, provider: provider, apiKey: apiKey),
+               !results.isEmpty {
+                return results
+            }
+        }
+        return await searchRSS(query: query, feeds: feeds)
+    }
+
+    /// 搜索服务商 API（Brave / Serper / Tavily）
+    static func searchAPI(query: String, provider: SearchProvider, apiKey: String) async -> [WebSearchResult]? {
+        switch provider {
+        case .brave:
+            return await braveSearch(query: query, apiKey: apiKey)
+        case .serper:
+            return await serperSearch(query: query, apiKey: apiKey)
+        case .tavily:
+            return await tavilySearch(query: query, apiKey: apiKey)
+        }
+    }
+
+    /// Brave Search API：GET /res/v1/web/search?q=，Header X-Subscription-Token
+    static func braveSearch(query: String, apiKey: String) async -> [WebSearchResult]? {
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: "https://api.search.brave.com/res/v1/web/search?q=\(encoded)&count=8") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue(apiKey, forHTTPHeaderField: "X-Subscription-Token")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let web = json["web"] as? [String: Any],
+                  let results = web["results"] as? [[String: Any]] else { return nil }
+            return results.prefix(8).map { item in
+                WebSearchResult(title: item["title"] as? String ?? "",
+                                summary: item["description"] as? String ?? "",
+                                source: item["url"] as? String ?? "Brave",
+                                date: nil)
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    /// Serper (Google) API：POST https://google.serper.dev/search，Header X-API-KEY
+    static func serperSearch(query: String, apiKey: String) async -> [WebSearchResult]? {
+        guard let url = URL(string: "https://google.serper.dev/search") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "X-API-KEY")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["q": query, "gl": "cn", "hl": "zh-cn", "num": 8])
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let organic = json["organic"] as? [[String: Any]] else { return nil }
+            return organic.prefix(8).map { item in
+                WebSearchResult(title: item["title"] as? String ?? "",
+                                summary: item["snippet"] as? String ?? "",
+                                source: item["link"] as? String ?? "Google",
+                                date: nil)
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    /// Tavily API：POST https://api.tavily.com/search
+    static func tavilySearch(query: String, apiKey: String) async -> [WebSearchResult]? {
+        guard let url = URL(string: "https://api.tavily.com/search") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["api_key": apiKey, "query": query, "max_results": 8, "include_answer": false])
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }
+            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]] else { return nil }
+            return results.prefix(8).map { item in
+                WebSearchResult(title: item["title"] as? String ?? "",
+                                summary: item["content"] as? String ?? "",
+                                source: item["url"] as? String ?? "Tavily",
+                                date: nil)
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    /// 兜底：内置 RSS 资讯源关键词检索
+    static func searchRSS(query: String, feeds: [NewsFeed], limit: Int = 6) async -> [WebSearchResult] {
         let keywords = keywords(from: query)
         guard !keywords.isEmpty else { return [] }
 

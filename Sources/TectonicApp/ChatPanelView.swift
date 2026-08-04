@@ -22,25 +22,10 @@ struct ChatPanelView: View {
     @FocusState private var inputFocused: Bool
 
     private var ai: AISettings { app.aiSettings }
-    private var reasoningLabel: String {
-        switch ai.reasoningEffort {
-        case "low": L10n.l("chat.effort.low")
-        case "high": L10n.l("chat.effort.high")
-        default: L10n.l("chat.effort.medium")
-        }
-    }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // 透明点击区（点击面板外关闭）
-            Color.black.opacity(0.05)
-                .contentShape(Rectangle())
-                .onTapGesture { app.chatPanel = nil }
-            panel
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-        .ignoresSafeArea()
-        .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
+        panel
+            .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
     }
 
     // MARK: 面板主体
@@ -56,7 +41,6 @@ struct ChatPanelView: View {
         .frame(width: 430)
         .frame(maxHeight: .infinity)
         .background(.regularMaterial)
-        .shadow(color: .black.opacity(0.2), radius: 24, x: -4, y: 0)
     }
 
     private var header: some View {
@@ -79,9 +63,6 @@ struct ChatPanelView: View {
                             .font(.caption2)
                             .foregroundStyle(.blue)
                     }
-                    Text(reasoningLabel)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
                 }
             }
             Spacer()
@@ -219,42 +200,18 @@ struct ChatPanelView: View {
                     .disabled(isThinking)
                 }
                 Spacer()
-                // 联网搜索快捷开关
-                Button {
-                    ai.webSearchEnabled.toggle()
-                } label: {
-                    Image(systemName: "globe")
-                        .font(.system(size: 12))
-                        .foregroundStyle(ai.webSearchEnabled ? Color.white : Color.secondary)
-                        .frame(width: 26, height: 22)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7)
-                                .fill(ai.webSearchEnabled ? Color.blue : Color.secondary.opacity(0.12))
-                        )
+                // 联网搜索状态（默认开启，无需开关）
+                if ai.webSearchEnabled {
+                    Label(L10n.l("chat.webSearchOn"), systemImage: "globe")
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                        .help(L10n.l("chat.webSearchHint"))
                 }
-                .buttonStyle(.borderless)
-                .help(L10n.l("chat.webSearch"))
-                // 思考深度快捷开关（点击循环 低→中→高）
-                Button {
-                    switch ai.reasoningEffort {
-                    case "low": ai.reasoningEffort = "medium"
-                    case "medium": ai.reasoningEffort = "high"
-                    default: ai.reasoningEffort = "low"
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "dial.medium")
-                            .font(.system(size: 12))
-                        Text(reasoningLabel)
-                            .font(.caption2)
-                    }
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .frame(height: 22)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.secondary.opacity(0.12)))
+                if !searchedSources.isEmpty {
+                    Text("\(searchedSources.count)")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderless)
-                .help("\(L10n.l("chat.thinkDepth")): \(reasoningLabel)")
             }
             HStack(spacing: 8) {
                 TextField(context.subtitle, text: $input, axis: .vertical)
@@ -295,16 +252,21 @@ struct ChatPanelView: View {
         let provider = ai.provider
         let model = ai.model
         let key = ai.apiKey(for: provider)
-        let effort = ai.reasoningEffort
-        let webEnabled = ai.webSearchEnabled
+        // 固定适中思考深度 + 默认联网
+        let effort = "medium"
+        let webEnabled = true
         let feeds = app.store.newsFeeds
+        let searchProvider = app.settings.searchProvider
+        let searchKey = app.settings.searchAPIKey
+        let skillHint = StockAnalysisSkills.skillHint(for: text)
 
         Task {
             defer { isThinking = false }
-            // 联网检索（可选）
+            // 联网检索（默认开启）
             var webContext = ""
             if webEnabled {
-                let results = await WebSearchService.search(query: text, feeds: feeds)
+                let results = await WebSearchService.search(query: text, feeds: feeds,
+                                                            provider: searchProvider, apiKey: searchKey)
                 if !results.isEmpty {
                     webContext = results.map {
                         "· [\($0.source)\($0.date.map { " \($0.formatted(.dateTime.month().day()))" } ?? "")] \($0.title)：\(String($0.summary.prefix(180)))"
@@ -313,8 +275,9 @@ struct ChatPanelView: View {
                 }
             }
             let system = context.systemBuilder(webContext)
+            let finalSystem = "\(system)\n\n\(StockAnalysisSkills.guidance)\n\(skillHint)"
             do {
-                let reply = try await ModelGateway().ask(text, system: system,
+                let reply = try await ModelGateway().ask(text, system: finalSystem,
                                                          provider: provider, model: model, apiKey: key,
                                                          reasoningEffort: effort)
                 messages.append(.assistant(reply))

@@ -98,12 +98,8 @@ public enum L10n {
         "detail.quickTrend": ["zh": "走势如何", "en": "Trend", "ja": "トレンド"],
         "detail.quickFundamental": ["zh": "基本面", "en": "Fundamentals", "ja": "ファンダメンタル"],
         "detail.quickNews": ["zh": "近期新闻", "en": "Recent News", "ja": "最近のニュース"],
-        "chat.effort.low": ["zh": "简洁思考", "en": "Concise", "ja": "簡潔"],
-        "chat.effort.medium": ["zh": "适中思考", "en": "Balanced", "ja": "標準"],
-        "chat.effort.high": ["zh": "深入思考", "en": "Deep", "ja": "深い"],
         "chat.webSearchOn": ["zh": "联网", "en": "Web", "ja": "オンライン"],
         "chat.clear": ["zh": "清空对话", "en": "Clear chat", "ja": "会話をクリア"],
-        "chat.thinkDepth": ["zh": "思考深度", "en": "Reasoning", "ja": "思考深度"],
         "chat.webSearch": ["zh": "联网搜索", "en": "Web Search", "ja": "Web検索"],
         "chat.webSearchHint": ["zh": "问询前检索相关资讯注入上下文（免费源）", "en": "Search news before answering (free sources)", "ja": "回答前にニュースを検索"],
         // 资讯
