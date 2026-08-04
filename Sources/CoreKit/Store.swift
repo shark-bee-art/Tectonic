@@ -40,19 +40,21 @@ public final class Store: ObservableObject {
         }
     }
 
-    /// 添加自选（按 URL 查重：symbolId 已存在则跳过）
+    /// 添加自选（按 symbolId 查重：已存在则跳过并返回 false）
     @discardableResult
     public func addToWatchlist(_ symbol: Symbol, group: String = "默认分组") throws -> Bool {
         let item = WatchlistItem(symbol: symbol, group: group,
                                  sortOrder: nextSortOrder(group: group))
         var record = WatchlistRecord(item: item)
+        var inserted = false
         try db.dbQueue.write { db in
             let exists = try WatchlistRecord.filter(Column("symbol_id") == record.symbolId).fetchCount(db) > 0
             guard !exists else { return }
             try record.insert(db)
+            inserted = true
         }
         try reload()
-        return true
+        return inserted
     }
 
     public func removeFromWatchlist(_ symbol: Symbol) throws {

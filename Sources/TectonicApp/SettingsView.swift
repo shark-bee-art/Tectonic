@@ -106,6 +106,7 @@ struct AISettingsTab: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var ai: AISettings
     @State private var customModel = ""
+    @State private var modelChoice: String = ""
 
     var body: some View {
         Form {
@@ -126,22 +127,21 @@ struct AISettingsTab: View {
             }
 
             Section("模型") {
-                Picker("模型", selection: $ai.model) {
+                Picker("模型", selection: $modelChoice) {
                     Text("\(ai.provider.presetModel)（默认）")
                         .tag(ai.provider.presetModel)
                     Text("自定义…").tag("__custom__")
                 }
                 .pickerStyle(.menu)
-                .disabled(false)
 
-                if ai.model == "__custom__" {
+                if modelChoice == "__custom__" {
                     TextField("输入模型名称", text: $customModel)
                         .onChange(of: customModel) { _, v in
                             if !v.isEmpty { ai.model = v }
                         }
                 }
 
-                Text("供应商：\(ai.provider.displayName)")
+                Text("供应商：\(ai.provider.displayName) · 模型：\(ai.model)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -168,6 +168,29 @@ struct AISettingsTab: View {
         }
         .formStyle(.grouped)
         .onAppear {
+            syncModelChoice()
+        }
+        .onChange(of: ai.provider) { _, _ in
+            syncModelChoice()
+        }
+        .onChange(of: modelChoice) { _, v in
+            if v != "__custom__" {
+                ai.model = v
+                customModel = ""
+            }
+        }
+    }
+
+    /// 同步 Picker 选择态：当前模型是预设 → 选中预设；否则 → 自定义并回填输入框
+    private func syncModelChoice() {
+        if ai.model == ai.provider.presetModel {
+            modelChoice = ai.provider.presetModel
+            customModel = ""
+        } else if ai.model.isEmpty || ai.model == "__custom__" {
+            modelChoice = "__custom__"
+            customModel = ""
+        } else {
+            modelChoice = "__custom__"
             customModel = ai.model
         }
     }

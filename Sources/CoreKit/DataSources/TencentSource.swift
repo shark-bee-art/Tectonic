@@ -120,14 +120,23 @@ public struct TencentSource: MarketDataSource, Sendable {
 
     public func fetchKLine(for symbol: Symbol, period: KLinePeriod, limit: Int) async throws -> [KLineBar] {
         let code = tencentCode(symbol)
-        let periodParam: String
-        switch period {
-        case .day: periodParam = "day"
-        case .week: periodParam = "week"
-        case .month: periodParam = "month"
-        case .m5: periodParam = "m5"
+        // m5（5分钟线）用 mkline 接口（仅支持 A股）；日/周/月用 fqkline 接口
+        if period == .m5 && symbol.market != .cn {
+            throw DataSourceError.notSupported("\(symbol.market.displayName) 暂无免费分时数据源")
         }
-        let urlStr = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=\(code),\(periodParam),,,\(limit),qfq"
+        let urlStr: String
+        if period == .m5 {
+            urlStr = "https://ifzq.gtimg.cn/appstock/app/kline/mkline?param=\(code),m5,,\(limit)"
+        } else {
+            let periodParam: String
+            switch period {
+            case .day: periodParam = "day"
+            case .week: periodParam = "week"
+            case .month: periodParam = "month"
+            case .m5: periodParam = "m5"
+            }
+            urlStr = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=\(code),\(periodParam),,,\(limit),qfq"
+        }
         guard let url = URL(string: urlStr) else {
             throw DataSourceError.invalidURL(urlStr)
         }
@@ -137,9 +146,9 @@ public struct TencentSource: MarketDataSource, Sendable {
               let item = dataDict[code] as? [String: Any] else {
             throw DataSourceError.parseFailed("腾讯K线结构异常")
         }
-        // 前复权键: qfqday / qfqweek / qfqmonth / m5（m5 无 qfq 前缀）
-        let key = period == .m5 ? "m5" : "qfq\(periodParam)"
-        guard let rows = (item[key] as? [[Any]]) ?? (item[periodParam] as? [[Any]]) else {
+        // 前复权键: qfqday / qfqweek / qfqmonth；m5 键为 m5
+        let key = period == .m5 ? "m5" : "qfq\(period == .day ? "day" : (period == .week ? "week" : "month"))"
+        guard let rows = (item[key] as? [[Any]]) ?? (item[period.rawValue == "m5" ? "m5" : (period.rawValue)] as? [[Any]]) else {
             throw DataSourceError.parseFailed("腾讯K线无数据")
         }
         let dateFormatter = DateFormatter()

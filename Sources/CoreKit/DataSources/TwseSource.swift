@@ -52,18 +52,35 @@ public struct TwseSource: MarketDataSource, Sendable {
     }
 
     public func search(query: String, market: Market?) async throws -> [Symbol] {
-        // TWSE 无搜索接口；代码精确匹配
+        // 只在明确选择台股市场时按代码匹配，避免纯数字（如 7203 日股/110022 基金）误判为台股
+        guard market == .tw else { return [] }
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ".TW", with: "")
             .replacingOccurrences(of: ".tw", with: "")
-        guard !trimmed.isEmpty, trimmed.allSatisfy(\.isNumber) else { return [] }
+        guard !trimmed.isEmpty, trimmed.allSatisfy(\.isNumber), (4...6).contains(trimmed.count) else { return [] }
         return [Symbol(market: .tw, code: trimmed, name: trimmed)]
     }
 
     public func fetchKLine(for symbol: Symbol, period: KLinePeriod, limit: Int) async throws -> [KLineBar] {
-        guard period == .day else {
-            throw DataSourceError.notSupported("TWSE 仅支持日K（月线聚合可后续补充）")
+        guard period != .m5 else {
+            throw DataSourceError.notSupported("TWSE 暂不支持分时")
         }
+        // 日K直接拉；周/月由日线聚合（与 CoinGecko 同法）
+        let daily = try await fetchDaily(symbol: symbol, limit: period == .day ? limit : max(limit * 7, 120))
+        switch period {
+        case .day:
+            return Array(daily.suffix(limit))
+        case .week:
+            return aggregate(daily, by: .weekOfYear).suffix(limit)
+        case .month:
+            return aggregate(daily, by: .month).suffix(limit)
+        case .m5:
+            return []
+        }
+    }
+
+    /// 拉取日线（TWSE 官方月接口，民国纪年）
+    private func fetchDaily(symbol: Symbol, limit: Int) async throws -> [KLineBar] {
         let code = symbol.code
             .replacingOccurrences(of: ".TW", with: "")
             .replacingOccurrences(of: ".tw", with: "")
@@ -116,5 +133,35 @@ public struct TwseSource: MarketDataSource, Sendable {
         }
         let sorted = bars.sorted { $0.time < $1.time }
         return Array(sorted.suffix(limit))
+    }
+
+    /// 日线聚合为周/月线
+    private func aggregate(_ daily: [KLineBar], by unit: Calendar.Component) -> [KLineBar] {
+        let cal = Calendar(identifier: .gregorian)
+        var result: [KLineBar] = []
+        var currentKey: Date?
+        var group: [KLineBar] = []
+        func flush() {
+            guard let first = group.first, let last = group.last else { return }
+            let period: KLinePeriod = unit == .weekOfYear ? .week : .month
+            result.append(KLineBar(symbolId: first.symbolId, period: period,
+                                   time: first.time,
+                                   open: first.open,
+                                   high: group.map(\.high).max() ?? first.high,
+                                   low: group.map(\.low).min() ?? first.low,
+                                   close: last.close,
+                                   volume: group.reduce(0) { $0 + $1.volume }))
+            group = []
+        }
+        for bar in daily {
+            let key = cal.dateInterval(of: unit, for: bar.time)?.start ?? bar.time
+            if let current = currentKey, current != key {
+                flush()
+            }
+            currentKey = key
+            group.append(bar)
+        }
+        flush()
+        return result
     }
 }

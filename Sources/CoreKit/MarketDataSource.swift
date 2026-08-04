@@ -26,6 +26,8 @@ public enum DataSourceError: Error, Sendable, LocalizedError {
 public protocol MarketDataSource: Sendable {
     var name: String { get }
     var supportedMarkets: Set<Market> { get }
+    /// 仅用于搜索（不提供行情/K线），行情路由会跳过此类源
+    var searchOnly: Bool { get }
 
     /// 拉取单个标的行情
     func fetchQuote(for symbol: Symbol) async throws -> Quote
@@ -41,6 +43,8 @@ public protocol MarketDataSource: Sendable {
 }
 
 public extension MarketDataSource {
+    var searchOnly: Bool { false }
+
     func fetchQuotes(for symbols: [Symbol]) async throws -> [Quote] {
         var result: [Quote] = []
         for s in symbols {
@@ -100,6 +104,7 @@ public final class MarketDataSourceRegistry: Sendable {
 
     private init() {
         sources = [
+            EastMoneySearchSource(),
             TencentSource(),
             TwseSource(),
             YahooSource(),
@@ -109,9 +114,14 @@ public final class MarketDataSourceRegistry: Sendable {
         ]
     }
 
-    /// 某市场的所有可用源（按优先级顺序：数组中先注册的优先）
+    /// 某市场的所有可用源（按优先级顺序：数组中先注册的优先）；排除 searchOnly 源
     public func sources(for market: Market) -> [any MarketDataSource] {
-        sources.filter { $0.supportedMarkets.contains(market) }
+        sources.filter { !$0.searchOnly && $0.supportedMarkets.contains(market) }
+    }
+
+    /// 所有参与搜索的源（含 searchOnly）
+    public var searchSources: [any MarketDataSource] {
+        sources
     }
 
     /// 带兜底的行情拉取：优先源失败时自动切换到下一个
@@ -156,7 +166,7 @@ public final class MarketDataSourceRegistry: Sendable {
 
     public func search(query: String, market: Market? = nil) async throws -> [Symbol] {
         var found: [Symbol] = []
-        for source in sources {
+        for source in searchSources {
             if let market, !source.supportedMarkets.contains(market) { continue }
             if let r = try? await source.search(query: query, market: market) {
                 found.append(contentsOf: r)
@@ -175,6 +185,13 @@ public final class MarketDataSourceRegistry: Sendable {
             } catch {
                 lastError = error
             }
+        }
+        // 明确不支持优先抛出；限流类错误（Yahoo 403 等）转成友好提示
+        if let e = lastError as? DataSourceError, case .notSupported = e {
+            throw e
+        }
+        if let e = lastError as? DataSourceError, case .httpError = e {
+            throw DataSourceError.notSupported("\(symbol.market.displayName) \(period.displayName) 数据源被限流，请稍后重试")
         }
         throw lastError ?? DataSourceError.emptyData("K线数据为空")
     }

@@ -28,6 +28,9 @@ final class AppState: ObservableObject {
         self.aiSettings = AISettings()
     }
 
+    // 行情自动刷新（60s）
+    private var refreshTimer: Timer?
+
     /// 刷新自选行情
     func refreshAll() async {
         guard !isRefreshing else { return }
@@ -36,9 +39,19 @@ final class AppState: ObservableObject {
         await store.refreshQuotes()
     }
 
-    /// 首次启动自动刷一次
+    /// 首次启动自动刷一次 + 启动定时刷新
     func onAppear() {
         Task { await refreshAll() }
+        startAutoRefresh()
+    }
+
+    func startAutoRefresh() {
+        guard refreshTimer == nil else { return }
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in await self?.refreshAll() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
     }
 }
 

@@ -174,8 +174,12 @@ struct TectonicCLI {
         case "add":
             guard args.count >= 3, let symbol = parseSymbol(args[2]) else { print("用法: watch add <market>:<code> [group]"); exit(1) }
             let group = args.count >= 4 ? args[3] : "默认分组"
-            try store.addToWatchlist(symbol, group: group)
-            print("已添加 \(symbol.market.displayName) \(symbol.code) 到「\(group)」")
+            let added = try store.addToWatchlist(symbol, group: group)
+            if added {
+                print("已添加 \(symbol.market.displayName) \(symbol.code) 到「\(group)」")
+            } else {
+                print("\(symbol.code) 已在自选中（去重跳过）")
+            }
 
         case "list":
             let items = try await db.dbQueue.read { db in

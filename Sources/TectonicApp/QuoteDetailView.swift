@@ -30,11 +30,6 @@ struct QuoteDetailView: View {
         .task(id: "\(symbol.id)-\(period.rawValue)") {
             await loadKline()
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                WatchlistToggle(symbol: symbol)
-            }
-        }
     }
 
     // MARK: 头部行情
@@ -57,6 +52,7 @@ struct QuoteDetailView: View {
                 ProgressView()
             }
             Spacer()
+            WatchlistToggle(symbol: symbol)
             Text(symbol.currency)
                 .font(.callout)
                 .foregroundStyle(.secondary)
