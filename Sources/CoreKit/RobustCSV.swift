@@ -124,15 +124,15 @@ public enum RobustCSV {
             .lowercased()
     }
 
-    /// 表头同义词大表 → 自动字段映射
+    /// 表头同义词大表 → 自动字段映射（覆盖主流券商：嘉信/盈透/富途/老虎/Robinhood/Webull 等）
     public static func mapHeaders(_ headers: [String]) -> [CSVField: Int] {
         let synonyms: [CSVField: [String]] = [
-            .symbol: ["symbol", "ticker", "code", "证券代码", "代码", "股票代码", "标的代码", "ticker symbol", "symbol/name", "证券"],
-            .name: ["name", "名称", "股票名称", "证券名称", "简称", "公司名称", "asset name"],
-            .quantity: ["quantity", "qty", "shares", "数量", "持仓数量", "持股数量", "持仓", "余额", "amount", "position", "持仓量", "股数", "份数", "balance"],
-            .costBasis: ["cost", "cost basis", "cost_basis", "costbasis", "average cost", "avg cost", "avgcost", "price", "成本价", "持仓成本", "成本", "平均成本", "成本价格", "买入成本", "成本均价", "持仓成本价", "单位成本", "average price"],
-            .market: ["market", "exchange", "市场", "交易所", "地区", "marketplace"],
-            .assetType: ["asset type", "type", "类型", "资产类别", "资产类型", "asset class", "security type"],
+            .symbol: ["symbol", "ticker", "code", "证券代码", "代码", "股票代码", "标的代码", "ticker symbol", "symbol/name", "证券", "instrument"],
+            .name: ["name", "名称", "股票名称", "证券名称", "简称", "公司名称", "asset name", "description", "描述", "证券名称"],
+            .quantity: ["quantity", "qty", "shares", "数量", "持仓数量", "持股数量", "持仓", "余额", "amount", "position", "持仓量", "股数", "份数", "balance", "持仓数量(股)"],
+            .costBasis: ["cost", "cost basis", "cost_basis", "costbasis", "average cost", "avg cost", "avgcost", "price", "成本价", "持仓成本", "成本", "平均成本", "成本价格", "买入成本", "成本均价", "持仓成本价", "单位成本", "average price", "avg price", "cost price"],
+            .market: ["market", "exchange", "市场", "交易所", "地区", "marketplace", "primary exchange"],
+            .assetType: ["asset type", "type", "类型", "资产类别", "资产类型", "asset class", "security type", "instrument type"],
         ]
         var mapping: [CSVField: Int] = [:]
         for (field, keys) in synonyms {
@@ -252,8 +252,20 @@ public enum RobustCSV {
         if up.hasSuffix(".TW") { return .tw }
         if up.hasSuffix(".SS") || up.hasSuffix(".SZ") { return .cn }
         if up.hasSuffix("USDT") || up.hasSuffix("USDC") || up.hasSuffix("BTC") || up.hasSuffix("ETH") { return .crypto }
-        if up.allSatisfy(\.isNumber), up.count == 6 {
-            return up.hasPrefix("0") || up.hasPrefix("1") ? .fund : .cn
+        if up.allSatisfy(\.isNumber) {
+            switch up.count {
+            case 5:
+                // 港股 5 位代码（00700 腾讯等）
+                return .hk
+            case 4:
+                // 台股 4 位（2330 台积电）/ 日股 4 位（7203 丰田）→ 台股优先
+                return .tw
+            case 6:
+                // A股/指数（600519 茅台、000001 平安）
+                return .cn
+            default:
+                break
+            }
         }
         return .us
     }

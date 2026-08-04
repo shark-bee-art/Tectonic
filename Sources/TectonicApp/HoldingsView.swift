@@ -13,6 +13,7 @@ struct HoldingsView: View {
     @State private var previewHoldings: [Holding] = []
     @State private var showPreview = false
     @State private var pendingURL: URL?
+    @State private var showManualAdd = false
 
     /// 各持仓当前市值（quotes 优先，成本价兜底）
     private var marketValues: [(Holding, Double)] {
@@ -57,6 +58,16 @@ struct HoldingsView: View {
                 .environmentObject(app)
             }
         }
+        .sheet(isPresented: $showManualAdd) {
+            HoldingEditor { holding in
+                if let h = holding {
+                    try? app.store.upsertHoldings([h])
+                    importMessage = "\(L10n.l("holdings.imported")) 1"
+                }
+                showManualAdd = false
+            }
+            .environmentObject(app)
+        }
     }
 
     // MARK: 空状态
@@ -77,6 +88,12 @@ struct HoldingsView: View {
                 Label(L10n.l("holdings.importFile"), systemImage: "square.and.arrow.down")
             }
             .buttonStyle(.borderedProminent)
+            Button {
+                showManualAdd = true
+            } label: {
+                Label(L10n.l("tx.add"), systemImage: "plus.circle")
+            }
+            .help(L10n.l("tx.add"))
             if isParsing {
                 ProgressView(L10n.l("holdings.aiParsing"))
             }
@@ -143,6 +160,14 @@ struct HoldingsView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(L10n.l("common.import")) { showImporter = true }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showManualAdd = true
+                } label: {
+                    Label(L10n.l("tx.add"), systemImage: "plus")
+                }
+                .help(L10n.l("tx.add"))
             }
             ToolbarItem(placement: .primaryAction) {
                 Button(L10n.l("holdings.importToWatchlist")) {
@@ -351,6 +376,110 @@ struct ImportPreviewSheet: View {
             guard let idx, idx >= 0, idx < values.count else { return "" }
             return values[idx]
         }
+    }
+}
+
+// MARK: - 手动添加持仓表单
+
+struct HoldingEditor: View {
+    @EnvironmentObject var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    let onSave: (Holding?) -> Void
+
+    @State private var code: String = ""
+    @State private var name: String = ""
+    @State private var market: Market = .us
+    @State private var assetType: AssetType = .stock
+    @State private var quantity: String = ""
+    @State private var costBasis: String = ""
+    @State private var hasOption: Bool = false
+    @State private var callPut: String = "call"
+    @State private var strike: String = ""
+    @State private var expiry: Date = Date().addingTimeInterval(30 * 86400)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(L10n.l("tx.add"))
+                .font(.title2.weight(.semibold))
+
+            Form {
+                Section {
+                    TextField(L10n.l("tx.code"), text: $code)
+                        .onSubmit { inferFromCode() }
+                    TextField(L10n.l("tx.name"), text: $name)
+                    Picker(L10n.l("sidebar.markets"), selection: $market) {
+                        ForEach(Market.allCases) { m in
+                            Text(m.displayName).tag(m)
+                        }
+                    }
+                    .onChange(of: assetType) { _, t in
+                        if market == .us || market == .crypto || market == .fund {
+                            market = t.defaultMarket
+                        }
+                    }
+                    Picker(L10n.l("tx.assetType"), selection: $assetType) {
+                        ForEach(AssetType.allCases) { t in
+                            Text(t.displayName).tag(t)
+                        }
+                    }
+                    TextField(L10n.l("tx.quantity"), text: $quantity)
+                    TextField(L10n.l("holdings.cost"), text: $costBasis)
+                }
+
+                if assetType == .option {
+                    Section(L10n.l("asset.option")) {
+                        Toggle("期权", isOn: $hasOption)
+                        if hasOption {
+                            Picker(L10n.l("option.callPut"), selection: $callPut) {
+                                Text(L10n.l("option.call")).tag("call")
+                                Text(L10n.l("option.put")).tag("put")
+                            }
+                            .pickerStyle(.segmented)
+                            TextField(L10n.l("option.strike"), text: $strike)
+                            DatePicker(L10n.l("option.expiry"), selection: $expiry, displayedComponents: .date)
+                        }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+
+            HStack {
+                Spacer()
+                Button(L10n.l("common.cancel")) { onSave(nil) }
+                Button(L10n.l("common.save")) { save() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                              || Double(quantity) == nil || Double(costBasis) == nil)
+            }
+        }
+        .padding(20)
+        .frame(width: 400, height: 480)
+    }
+
+    /// 从代码推断市场/名称
+    private func inferFromCode() {
+        let c = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard !c.isEmpty else { return }
+        let m = RobustCSV.inferMarket(c)
+        if market == .us || market == .hk || market == .cn || market == .tw || market == .crypto {
+            market = m
+        }
+        if name.isEmpty { name = c }
+    }
+
+    private func save() {
+        let c = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let option: OptionSpec? = assetType == .option && hasOption
+            ? OptionSpec(callPut: callPut, strikePrice: Double(strike) ?? 0, expiryDate: expiry)
+            : nil
+        let holding = Holding(symbol: Symbol(market: market, code: c, name: name.isEmpty ? c : name),
+                              quantity: Double(quantity) ?? 0,
+                              costBasis: Double(costBasis) ?? 0,
+                              broker: "手动",
+                              assetType: assetType,
+                              option: option)
+        onSave(holding)
+        dismiss()
     }
 }
 
