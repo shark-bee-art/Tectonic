@@ -1,15 +1,14 @@
 import SwiftUI
 import CoreKit
-import Charts
 
-/// 标的详情：行情概览 + K线 + AI 问询对话
+/// 标的详情：行情概览 + K线（苹果股市风格）+ AI 问询对话
 struct QuoteDetailView: View {
     @EnvironmentObject var app: AppState
     let symbol: Symbol
 
     @State private var quote: Quote?
     @State private var bars: [KLineBar] = []
-    @State private var period: KLinePeriod = .day
+    @State private var range: ChartRange = .threeMonth
     @State private var isLoadingKline = false
     @State private var klineError: String?
 
@@ -27,7 +26,7 @@ struct QuoteDetailView: View {
         .task(id: symbol.id) {
             quote = await app.store.quote(for: symbol)
         }
-        .task(id: "\(symbol.id)-\(period.rawValue)") {
+        .task(id: "\(symbol.id)-\(range.rawValue)") {
             await loadKline()
         }
     }
@@ -59,7 +58,7 @@ struct QuoteDetailView: View {
         }
     }
 
-    // MARK: K线
+    // MARK: K线（苹果股市风格）
 
     private var klineSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -67,41 +66,78 @@ struct QuoteDetailView: View {
                 Text("K线")
                     .font(.headline)
                 Spacer()
-                Picker("周期", selection: $period) {
-                    ForEach(KLinePeriod.allCases, id: \.self) { p in
-                        Text(p.displayName).tag(p)
+                Picker("时间范围", selection: $range) {
+                    ForEach(ChartRange.allCases) { r in
+                        Text(r.rawValue).tag(r)
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 220)
+                .frame(width: 300)
+            }
+            // 当前范围最近一根 OHLC 信息（苹果股市顶部信息条）
+            if let last = bars.last {
+                let up = last.close >= last.open
+                HStack(spacing: 16) {
+                    infoItem("开", fmt(last.open))
+                    infoItem("高", fmt(last.high))
+                    infoItem("低", fmt(last.low))
+                    infoItem("收", fmt(last.close), color: up ? Color.red : Color.green)
+                    Text("\(fmtSigned(last.close - last.open)) (\(fmtPercent((last.close - last.open) / last.open * 100)))")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(up ? Color.red : Color.green)
+                    Spacer()
+                    Text(periodLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 2)
             }
             if isLoadingKline {
                 ProgressView()
-                    .frame(maxWidth: .infinity, minHeight: 300)
+                    .frame(maxWidth: .infinity, minHeight: 280)
             } else if let klineError {
                 Text(klineError)
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 300)
+                    .frame(maxWidth: .infinity, minHeight: 280)
             } else if bars.isEmpty {
                 Text("暂无数据")
                     .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 300)
+                    .frame(maxWidth: .infinity, minHeight: 280)
             } else {
                 KLineChart(bars: bars)
-                    .frame(height: 320)
+                    .frame(height: 300)
             }
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
     }
 
+    private func infoItem(_ label: String, _ value: String, color: Color? = nil) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(color ?? Color.primary)
+        }
+    }
+
+    /// 当前范围使用的周期描述
+    private var periodLabel: String {
+        let (period, _) = range.target
+        return period == .m5 ? "分时" : "\(period.displayName) · \(bars.count) 根"
+    }
+
     private func loadKline() async {
         isLoadingKline = true
         defer { isLoadingKline = false }
+        let (period, limit) = range.target
         do {
-            bars = try await app.store.kline(for: symbol, period: period)
+            bars = try await app.store.kline(for: symbol, period: period, limit: limit)
             klineError = nil
         } catch {
+            bars = []
             klineError = "K线加载失败: \(error.localizedDescription)"
         }
     }
@@ -152,51 +188,6 @@ struct WatchlistToggle: View {
                   systemImage: inList ? "star.fill" : "star")
         }
         .help(inList ? "移出自选" : "添加自选")
-    }
-}
-
-// MARK: - K线图（Swift Charts 蜡烛图）
-
-struct KLineChart: View {
-    let bars: [KLineBar]
-
-    var body: some View {
-        Chart {
-            ForEach(Array(bars.enumerated()), id: \.element.id) { index, bar in
-                // 影线
-                RuleMark(
-                    x: .value("index", index),
-                    yStart: .value("low", bar.low),
-                    yEnd: .value("high", bar.high)
-                )
-                .lineStyle(StrokeStyle(lineWidth: 1))
-                .foregroundStyle(bar.close >= bar.open ? Color.red : Color.green)
-
-                // 实体
-                RectangleMark(
-                    x: .value("index", index),
-                    yStart: .value("open", max(bar.open, bar.close)),
-                    yEnd: .value("close", min(bar.open, bar.close))
-                )
-                .foregroundStyle(bar.close >= bar.open ? Color.red : Color.green)
-                .cornerRadius(1)
-            }
-        }
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: 6)) { _ in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel()
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .trailing) { _ in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel()
-            }
-        }
-        .chartXScale(domain: 0...max(bars.count, 1))
     }
 }
 

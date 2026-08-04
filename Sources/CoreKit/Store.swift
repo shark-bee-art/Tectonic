@@ -105,8 +105,8 @@ public final class Store: ObservableObject {
         return try? await registry.fetchQuote(for: symbol)
     }
 
-    public func kline(for symbol: Symbol, period: KLinePeriod) async throws -> [KLineBar] {
-        try await registry.fetchKLine(for: symbol, period: period)
+    public func kline(for symbol: Symbol, period: KLinePeriod, limit: Int = 320) async throws -> [KLineBar] {
+        try await registry.fetchKLine(for: symbol, period: period, limit: limit)
     }
 
     public func search(query: String, market: Market? = nil) async -> [Symbol] {
