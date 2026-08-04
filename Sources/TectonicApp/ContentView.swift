@@ -69,39 +69,8 @@ struct SidebarView: View {
                 Label("持仓", systemImage: "briefcase")
                     .tag(AppState.SidebarItem.holdings)
             }
-            Section("市场") {
-                ForEach(app.activeMarkets) { market in
-                    Button {
-                        app.selectedTab = .markets
-                    } label: {
-                        HStack {
-                            Image(systemName: marketIcon(market))
-                                .frame(width: 16)
-                            Text(market.displayName)
-                            Spacer()
-                            Text(market.currency)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
         }
         .listStyle(.sidebar)
-    }
-
-    private func marketIcon(_ m: Market) -> String {
-        switch m {
-        case .us: "building.columns"
-        case .crypto: "bitcoinsign"
-        case .hk: "building.2"
-        case .cn: "building"
-        case .fund: "chart.pie"
-        case .kr: "building.2.crop.circle"
-        case .jp: "sun.max"
-        case .tw: "mountain.2"
-        }
     }
 }
 

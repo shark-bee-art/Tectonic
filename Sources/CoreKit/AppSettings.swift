@@ -58,6 +58,30 @@ public final class AppSettings: ObservableObject {
         marketOrder = newOrder
     }
 
+    /// 移动某市场到新位置（支持拖拽 onMove 与上下按钮）
+    public func moveMarket(from source: IndexSet, to destination: Int) {
+        guard let fromIdx = source.first, fromIdx < marketOrder.count else { return }
+        var order = marketOrder
+        let item = order.remove(at: fromIdx)
+        let toIdx = destination > fromIdx ? destination - 1 : destination
+        order.insert(item, at: min(max(toIdx, 0), order.count))
+        marketOrder = order
+    }
+
+    public func moveMarketUp(_ market: Market) {
+        guard let idx = marketOrder.firstIndex(of: market), idx > 0 else { return }
+        var order = marketOrder
+        order.swapAt(idx, idx - 1)
+        marketOrder = order
+    }
+
+    public func moveMarketDown(_ market: Market) {
+        guard let idx = marketOrder.firstIndex(of: market), idx < marketOrder.count - 1 else { return }
+        var order = marketOrder
+        order.swapAt(idx, idx + 1)
+        marketOrder = order
+    }
+
     private func save() {
         let encoder = JSONEncoder()
         let d = UserDefaults.standard

@@ -146,10 +146,19 @@ struct TectonicCLI {
             }
 
         case "models":
+            let refresh = args.contains("--refresh")
             for p in ModelProvider.allCases {
                 let keySet = !(AISettings().apiKey(for: p) ?? "").isEmpty
-                print("  \(p.rawValue)  \(p.displayName)  [\(p.group)]  key:\(keySet ? "已设置" : "未设置")  模型: \(p.presetModel)")
+                let catalog = ModelCatalog.available(provider: p)
+                print("  \(p.rawValue)  \(p.displayName)  [\(p.group)]  key:\(keySet ? "已设置" : "未设置")  目录:\(catalog.count) 个模型")
+                if refresh {
+                    let refreshed = await ModelCatalog.refresh(provider: p, apiKey: AISettings().apiKey(for: p))
+                    print("    → 刷新: \(refreshed?.count ?? -1) 个（\(refreshed?.prefix(6).joined(separator: ", ") ?? "失败")）")
+                } else if p == .ollama || keySet {
+                    print("    → \(catalog.prefix(8).joined(separator: ", "))")
+                }
             }
+            if refresh { print("（已刷新并缓存，7 天有效）") }
 
         case "markets":
             for m in Market.allCases {

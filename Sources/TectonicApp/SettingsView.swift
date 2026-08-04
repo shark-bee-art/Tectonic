@@ -51,39 +51,43 @@ struct MarketSettingsTab: View {
                     }
                 }
             }
-            Section("优先级（拖拽排序）") {
-                ForEach(app.settings.marketOrder) { market in
-                    HStack {
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(.tertiary)
-                        Text(market.displayName)
-                        Spacer()
-                        Text(market.currency)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            Section("优先级（拖拽或按钮排序）") {
+                List {
+                    ForEach(app.settings.marketOrder) { market in
+                        HStack {
+                            Image(systemName: "line.3.horizontal")
+                                .foregroundStyle(.tertiary)
+                            Text(market.displayName)
+                            Spacer()
+                            Button {
+                                app.settings.moveMarketUp(market)
+                            } label: {
+                                Image(systemName: "chevron.up")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(app.settings.marketOrder.first == market)
+                            Button {
+                                app.settings.moveMarketDown(market)
+                            } label: {
+                                Image(systemName: "chevron.down")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(app.settings.marketOrder.last == market)
+                            Text(market.currency)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 48)
+                        }
                     }
-                    .draggable(market.rawValue)
+                    .onMove { from, to in
+                        app.settings.moveMarket(from: from, to: to)
+                    }
                 }
-                .onInsert(of: [UTType.text], perform: insert)
+                .listStyle(.inset)
+                .frame(height: CGFloat(app.settings.marketOrder.count) * 32 + 16)
             }
         }
         .formStyle(.grouped)
-    }
-
-    private func insert(at index: Int, _ items: [NSItemProvider]) {
-        // 简化：从已启用列表重建顺序（拖拽重排）
-        for provider in items {
-            _ = provider.loadObject(ofClass: NSString.self) { str, _ in
-                guard let raw = str as? String,
-                      let market = Market(rawValue: raw) else { return }
-                DispatchQueue.main.async {
-                    var order = app.settings.marketOrder
-                    order.removeAll { $0 == market }
-                    order.insert(market, at: min(index, order.count))
-                    app.settings.setOrder(order)
-                }
-            }
-        }
     }
 
     private func marketIcon(_ m: Market) -> String {
@@ -105,8 +109,9 @@ struct MarketSettingsTab: View {
 struct AISettingsTab: View {
     @EnvironmentObject var app: AppState
     @EnvironmentObject var ai: AISettings
-    @State private var customModel = ""
-    @State private var modelChoice: String = ""
+    @State private var availableModels: [String] = []
+    @State private var modelSelection: String?
+    @State private var showCustomModelField = false
 
     var body: some View {
         Form {
@@ -127,21 +132,24 @@ struct AISettingsTab: View {
             }
 
             Section("模型") {
-                Picker("模型", selection: $modelChoice) {
-                    Text("\(ai.provider.presetModel)（默认）")
-                        .tag(ai.provider.presetModel)
-                    Text("自定义…").tag("__custom__")
+                Picker("模型", selection: $modelSelection) {
+                    ForEach(availableModels, id: \.self) { m in
+                        Text(m).tag(Optional(m))
+                    }
+                    if !availableModels.isEmpty {
+                        Divider()
+                    }
+                    Text("自定义模型…").tag(Optional("__custom__"))
                 }
                 .pickerStyle(.menu)
 
-                if modelChoice == "__custom__" {
-                    TextField("输入模型名称", text: $customModel)
-                        .onChange(of: customModel) { _, v in
-                            if !v.isEmpty { ai.model = v }
-                        }
+                if showCustomModelField {
+                    TextField("自定义模型名称", text: $ai.model)
                 }
 
-                Text("供应商：\(ai.provider.displayName) · 模型：\(ai.model)")
+                Text(availableModels.isEmpty
+                     ? "模型列表加载中…"
+                     : "可选 \(availableModels.count) 个模型 · 每周自动更新")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -168,30 +176,45 @@ struct AISettingsTab: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            syncModelChoice()
+            loadModels()
+            syncModelSelection()
         }
         .onChange(of: ai.provider) { _, _ in
-            syncModelChoice()
+            loadModels()
+            syncModelSelection()
         }
-        .onChange(of: modelChoice) { _, v in
-            if v != "__custom__" {
+        .onChange(of: modelSelection) { _, v in
+            if v == "__custom__" {
+                showCustomModelField = true
+            } else if let v, !v.isEmpty {
+                showCustomModelField = false
                 ai.model = v
-                customModel = ""
             }
         }
     }
 
-    /// 同步 Picker 选择态：当前模型是预设 → 选中预设；否则 → 自定义并回填输入框
-    private func syncModelChoice() {
-        if ai.model == ai.provider.presetModel {
-            modelChoice = ai.provider.presetModel
-            customModel = ""
-        } else if ai.model.isEmpty || ai.model == "__custom__" {
-            modelChoice = "__custom__"
-            customModel = ""
+    /// 加载模型目录：本地缓存/静态清单立即填充，过期则后台刷新
+    private func loadModels() {
+        availableModels = ModelCatalog.available(provider: ai.provider)
+        guard ModelCatalog.isStale(provider: ai.provider) else { return }
+        let provider = ai.provider
+        let key = ai.apiKey(for: provider)
+        Task {
+            if let fresh = await ModelCatalog.refresh(provider: provider, apiKey: key) {
+                availableModels = fresh
+                syncModelSelection()
+            }
+        }
+    }
+
+    /// 同步 Picker 选择态：当前模型在目录 → 选中该项；否则 → 自定义并显示输入框
+    private func syncModelSelection() {
+        if availableModels.contains(ai.model) {
+            modelSelection = ai.model
+            showCustomModelField = false
         } else {
-            modelChoice = "__custom__"
-            customModel = ai.model
+            modelSelection = "__custom__"
+            showCustomModelField = true
         }
     }
 
