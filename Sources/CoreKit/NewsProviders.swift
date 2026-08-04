@@ -175,6 +175,16 @@ public struct OdailySource: Sendable {
     public init() {}
 
     public func fetch(limit: Int = 30) async throws -> [NewsItem] {
+        // 重试一次（Odaily CDN 对连续请求偶发限流）
+        do {
+            return try await fetchOnce(limit: limit)
+        } catch {
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            return try await fetchOnce(limit: limit)
+        }
+    }
+
+    private func fetchOnce(limit: Int) async throws -> [NewsItem] {
         let urlStr = "https://web-api.odaily.news/infoFlow/list?page=1&size=\(min(limit, 50))"
         guard let url = URL(string: urlStr) else {
             throw NewsSourceError.parseFailed("Odaily URL 无效")
