@@ -78,6 +78,10 @@ public enum NewsFeedCatalog {
                  url: "https://cointelegraph.com/rss"),
         NewsFeed(name: "The Block", category: .flash, kind: .rss,
                  url: "https://www.theblock.co/rss.xml"),
+        NewsFeed(name: "Yahoo Finance 美股大盘", category: .flash, kind: .rss,
+                 url: "https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US"),
+        NewsFeed(name: "Yahoo Finance 科技龙头", category: .flash, kind: .rss,
+                 url: "https://feeds.finance.yahoo.com/rss/2.0/headline?s=AAPL,MSFT,NVDA,GOOGL,AMZN,TSLA&region=US&lang=en-US"),
         // 研报（机构/深度分析）
         NewsFeed(name: "Fortune", category: .research, kind: .rss,
                  url: "https://fortune.com/feed"),
