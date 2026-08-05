@@ -248,6 +248,27 @@ public final class Store: ObservableObject {
         }
     }
 
+    // MARK: - 恐惧贪婪指数（加密市场情绪）
+
+    @Published public private(set) var fearGreed: FearGreedIndex?
+    @Published public private(set) var fearGreedLoading = false
+    private var fearGreedCacheTime: Date?
+
+    /// 恐惧贪婪指数（1 小时缓存；alternative.me 约 8 小时才更新一次）
+    public func fetchFearGreed() async {
+        fearGreedLoading = true
+        defer { fearGreedLoading = false }
+        if let t = fearGreedCacheTime, Date().timeIntervalSince(t) < 60 * 60, fearGreed != nil {
+            return
+        }
+        do {
+            fearGreed = try await FearGreedSource.fetch()
+            fearGreedCacheTime = Date()
+        } catch {
+            // 详情页非核心数据：静默失败，保留旧值
+        }
+    }
+
     // MARK: - 内置预置标的
 
     /// 导入内置标的（幂等：已存在的跳过），返回新增数量

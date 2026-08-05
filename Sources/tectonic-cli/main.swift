@@ -55,6 +55,16 @@ struct TectonicCLI {
                 exit(1)
             }
 
+        case "feargreed":
+            do {
+                let fg = try await FearGreedSource.fetch()
+                print("恐惧贪婪指数: \(fg.value)（\(fg.level)/\(fg.classification)）")
+                print("更新时间: \(fg.timestamp.formatted(date: .abbreviated, time: .shortened))")
+            } catch {
+                print("失败: \(error.localizedDescription)")
+                exit(1)
+            }
+
         case "kline":
             guard args.count >= 2, let symbol = parseSymbol(args[1]) else { print("用法: kline <market>:<code> [period] [limit]"); exit(1) }
             let period = KLinePeriod(rawValue: args.count >= 3 ? args[2] : "day") ?? .day

@@ -36,6 +36,9 @@ struct QuoteDetailView: View {
         }
         .task(id: "\(symbol.id)-tech") {
             await loadTechnical()
+            if symbol.market == .crypto {
+                await app.store.fetchFearGreed()
+            }
         }
     }
 
@@ -204,6 +207,31 @@ struct QuoteDetailView: View {
                                         .font(.caption)
                                         .foregroundStyle(k >= 80 ? Color.red : (k <= 20 ? Color.green : Color.secondary))
                                 }
+                            }
+                        }
+                    }
+
+                    // 市场情绪（恐惧贪婪指数，仅加密标的）
+                    if symbol.market == .crypto {
+                        Divider()
+                        HStack(spacing: 8) {
+                            Text("市场情绪")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            if app.store.fearGreedLoading {
+                                ProgressView().controlSize(.small)
+                            } else if let fg = app.store.fearGreed {
+                                Text("\(fg.value)")
+                                    .font(.system(.body, design: .rounded).weight(.bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(fg.value >= 55 ? Color.red : (fg.value <= 44 ? Color.green : Color.secondary))
+                                Text("\(fg.level)（\(fg.classification)）")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("—")
+                                    .foregroundStyle(.secondary)
                             }
                         }
                     }
