@@ -10,12 +10,16 @@ struct QuoteDetailView: View {
     @State private var technical: TechnicalSummary?
     @State private var isLoadingTech = false
     @State private var techError: String?
+    @State private var fundamental: FundamentalData?
+    @State private var isLoadingFund = false
+    @State private var fundError: String?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
                 technicalSection
+                fundamentalSection
             }
             .padding(20)
         }
@@ -33,6 +37,9 @@ struct QuoteDetailView: View {
         }
         .task(id: symbol.id) {
             quote = await app.store.quote(for: symbol)
+        }
+        .task(id: "\(symbol.id)-fund") {
+            await loadFundamental()
         }
         .task(id: "\(symbol.id)-tech") {
             await loadTechnical()
@@ -100,6 +107,143 @@ struct QuoteDetailView: View {
             Text(symbol.currency)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+
+    // MARK: 基本面数据（SEC EDGAR，仅美股）
+
+    private var fundamentalSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(L10n.l("detail.fundamental"))
+                    .font(.headline)
+                Spacer()
+                if let fd = fundamental, let year = fd.revenueYear {
+                    Text(L10n.l("detail.fundFiscalYear") + " " + year)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if isLoadingFund {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else if let fundError {
+                Text(fundError)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else if let fd = fundamental {
+                VStack(alignment: .leading, spacing: 14) {
+                    // 盈利能力
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L10n.l("detail.fundProfitability"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+                            GridRow {
+                                fundItem(L10n.l("detail.fundRevenue"), value: fd.revenue.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundNetIncome"), value: fd.netIncome.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundOperatingIncome"), value: fd.operatingIncome.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundGrossProfit"), value: fd.grossProfit.map { fmtAmount($0) })
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // 每股与估值
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L10n.l("detail.fundValuation"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+                            GridRow {
+                                fundItem(L10n.l("detail.fundEPS"), value: fd.eps.map { String(format: "%.2f", $0) })
+                                fundItem("ROE", value: fd.roe.map { String(format: "%.1f%%", $0) })
+                                fundItem("PE", value: quote.flatMap { fd.pe(price: $0.price) }.map { String(format: "%.1f", $0) })
+                                fundItem("PB", value: quote.flatMap { fd.pb(price: $0.price) }.map { String(format: "%.1f", $0) })
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // 资产负债
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(L10n.l("detail.fundBalance"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+                            GridRow {
+                                fundItem(L10n.l("detail.fundAssets"), value: fd.assets.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundLiabilities"), value: fd.liabilities.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundEquity"), value: fd.equity.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundDebtRatio"), value: fd.debtRatio.map { String(format: "%.1f%%", $0) })
+                            }
+                            GridRow {
+                                fundItem(L10n.l("detail.fundShares"), value: fd.sharesOutstanding.map { fmtAmount($0) })
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 4) {
+                        Text("SEC EDGAR")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        if let fd = fundamental, let bd = fd.balanceDate {
+                            Text("· " + L10n.l("detail.fundBalanceDate") + " " + bd)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+            } else {
+                Text(L10n.l("detail.fundUnsupported"))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            }
+        }
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.04)))
+    }
+
+    private func fundItem(_ title: String, value: String?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if let value {
+                Text(value)
+                    .font(.body.weight(.medium).monospacedDigit())
+            } else {
+                Text("—")
+                    .font(.body.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 金额简写：≥1T → T、≥1B → B、≥1M → M
+    private func fmtAmount(_ v: Double) -> String {
+        if v >= 1_000_000_000_000 { return String(format: "%.2fT", v / 1_000_000_000_000) }
+        if v >= 1_000_000_000 { return String(format: "%.2fB", v / 1_000_000_000) }
+        if v >= 1_000_000 { return String(format: "%.2fM", v / 1_000_000) }
+        return String(format: "%.0f", v)
+    }
+
+    private func loadFundamental() async {
+        guard symbol.market == .us else { return }
+        guard fundamental == nil else { return }
+        isLoadingFund = true
+        defer { isLoadingFund = false }
+        do {
+            fundamental = try await EDGARSource.shared.fundamental(for: symbol)
+            fundError = nil
+        } catch {
+            fundamental = nil
+            fundError = "基本面加载失败: \\(error.localizedDescription)"
         }
     }
 

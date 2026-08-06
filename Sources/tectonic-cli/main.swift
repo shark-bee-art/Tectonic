@@ -108,6 +108,27 @@ struct TectonicCLI {
                 exit(1)
             }
 
+        case "fund":
+            guard args.count >= 2, let symbol = parseSymbol(args[1]) else { print("用法: fund <market>:<code>（SEC EDGAR 基本面，仅美股）"); exit(1) }
+            do {
+                let fd = try await EDGARSource.shared.fundamental(for: symbol)
+                print("\(symbol.code) \(symbol.name) — SEC EDGAR 基本面")
+                if let r = fd.revenue { print("  营收(财年\(fd.revenueYear ?? "—")): \(fmt(r))") }
+                if let ni = fd.netIncome { print("  净利润: \(fmt(ni))") }
+                if let oi = fd.operatingIncome { print("  营业利润: \(fmt(oi))") }
+                if let gp = fd.grossProfit { print("  毛利: \(fmt(gp))") }
+                if let e = fd.eps { print("  基本EPS: \(String(format: "%.2f", e))") }
+                if let a = fd.assets { print("  总资产(\(fd.balanceDate ?? "—")): \(fmt(a))") }
+                if let l = fd.liabilities { print("  总负债: \(fmt(l))") }
+                if let eq = fd.equity { print("  股东权益: \(fmt(eq))") }
+                if let s = fd.sharesOutstanding { print("  流通股: \(Int(s))") }
+                if let roe = fd.roe { print("  ROE: \(String(format: "%.1f%%", roe))") }
+                if let dr = fd.debtRatio { print("  资产负债率: \(String(format: "%.1f%%", dr))") }
+            } catch {
+                print("失败: \(error.localizedDescription)")
+                exit(1)
+            }
+
         case "search":
             guard args.count >= 2 else { print("用法: search <query> [market]"); exit(1) }
             let market = args.count >= 3 ? Market(rawValue: args[2]) : nil
