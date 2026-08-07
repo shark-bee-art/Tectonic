@@ -76,12 +76,12 @@ final class AppState: ObservableObject {
     // 行情自动刷新（60s）
     private var refreshTimer: Timer?
 
-    /// 刷新自选行情
+    /// 刷新自选 + 持仓行情
     func refreshAll() async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        await store.refreshQuotes()
+        await store.refreshPortfolioQuotes()
     }
 
     /// 首次启动自动刷一次 + 导入内置标的/订阅源 + 启动定时刷新

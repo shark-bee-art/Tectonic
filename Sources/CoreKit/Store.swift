@@ -22,6 +22,7 @@ public final class Store: ObservableObject {
         try? reload()
         try? reloadFeeds()
         try? reloadTrades()
+        try? reloadPortfolio()
     }
 
     // MARK: - 自选
@@ -421,5 +422,182 @@ public final class Store: ObservableObject {
         var seen: Set<String> = []
         let deduped = all.filter { seen.insert($0.id).inserted }
         return deduped.sorted { $0.publishedAt > $1.publishedAt }
+    }
+
+    // MARK: - 平台（券商）
+
+    @Published public private(set) var platforms: [Platform] = []
+    @Published public private(set) var accounts: [Account] = []
+    @Published public private(set) var assets: [String: Asset] = [:]
+    @Published public private(set) var activities: [Activity] = []
+
+    public func reloadPortfolio() throws {
+        platforms = try db.dbQueue.read { db in
+            try PlatformRecord.order(Column("name")).fetchAll(db).map { $0.toPlatform() }
+        }
+        accounts = try db.dbQueue.read { db in
+            try AccountRecord.order(Column("sort_order"), Column("name")).fetchAll(db).map { $0.toAccount() }
+        }
+        assets = try db.dbQueue.read { db in
+            let list = try AssetRecord.fetchAll(db).map { $0.toAsset() }
+            return Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0) })
+        }
+        activities = try db.dbQueue.read { db in
+            try ActivityRecord.order(Column("date").desc).fetchAll(db).map { $0.toActivity() }
+        }
+    }
+
+    public func addPlatform(_ p: Platform) throws {
+        var record = PlatformRecord(platform: p)
+        try db.dbQueue.write { db in
+            try record.insert(db)
+        }
+        try reloadPortfolio()
+    }
+
+    public func removePlatform(_ p: Platform) throws {
+        try db.dbQueue.write { db in
+            _ = try PlatformRecord.deleteOne(db, key: p.id)
+        }
+        try reloadPortfolio()
+    }
+
+    // MARK: - 账户
+
+    public func addAccount(_ a: Account) throws {
+        var record = AccountRecord(account: a)
+        try db.dbQueue.write { db in
+            try record.insert(db)
+        }
+        try reloadPortfolio()
+    }
+
+    public func updateAccount(_ a: Account) throws {
+        try db.dbQueue.write { db in
+            var record = AccountRecord(account: a)
+            try record.update(db)
+        }
+        try reloadPortfolio()
+    }
+
+    public func removeAccount(_ a: Account) throws {
+        try db.dbQueue.write { db in
+            // 活动级联删除
+            _ = try ActivityRecord.filter(Column("account_id") == a.id).deleteAll(db)
+            _ = try AccountRecord.deleteOne(db, key: a.id)
+        }
+        try reloadPortfolio()
+    }
+
+    /// 默认账户（无则取第一个；都没有则创建）
+    public func defaultAccount() -> Account {
+        if let d = accounts.first(where: { $0.isDefault && $0.isActive }) { return d }
+        if let first = accounts.first(where: { $0.isActive }) { return first }
+        let a = Account(name: "默认账户", type: .securities, currency: "USD", isDefault: true)
+        try? addAccount(a)
+        return a
+    }
+
+    // MARK: - 资产
+
+    /// 资产 upsert（交易录入时同步标的）
+    public func upsertAsset(_ asset: Asset) throws {
+        try db.dbQueue.write { db in
+            var record = AssetRecord(asset: asset)
+            try record.save(db)   // upsert by primary key
+        }
+        try reloadPortfolio()
+    }
+
+    // MARK: - 活动（交易）
+
+    /// 添加/更新一笔交易活动（同时同步资产表）
+    public func upsertActivity(_ activity: Activity) throws {
+        try db.dbQueue.write { db in
+            if let assetID = activity.assetID, let asset = assets[assetID] {
+                var record = AssetRecord(asset: asset)
+                try record.save(db)
+            }
+            var record = ActivityRecord(activity: activity)
+            try record.save(db)
+        }
+        try reloadPortfolio()
+    }
+
+    public func deleteActivity(_ activity: Activity) throws {
+        try db.dbQueue.write { db in
+            _ = try ActivityRecord.deleteOne(db, key: activity.id)
+        }
+        try reloadPortfolio()
+    }
+
+    // MARK: - 持仓/估值（推导）
+
+    /// 某账户（或全部账户）的当前持仓
+    /// - Parameter accountID: nil = 全部账户合并
+    public func positions(accountID: String? = nil) -> [Position] {
+        let act = activities.filter {
+            $0.status == "POSTED" && (accountID == nil || $0.accountID == accountID)
+        }
+        let lots = LotEngine.computeLots(activities: act).lots
+        var prices: [String: Double] = [:]
+        for (id, q) in quotes {
+            prices[id] = q.price
+        }
+        return PositionCalculator.positions(from: lots, assets: assets, prices: prices)
+    }
+
+    /// 某账户的估值（nil = 合并全部账户的模拟单一账户）
+    public func valuation(accountID: String? = nil) -> PortfolioValuation {
+        let act = activities.filter {
+            $0.status == "POSTED" && (accountID == nil || $0.accountID == accountID)
+        }
+        let lots = LotEngine.computeLots(activities: act).lots
+        var prices: [String: Double] = [:]
+        for (id, q) in quotes {
+            prices[id] = q.price
+        }
+        return ValuationCalculator.valuation(accountID: accountID ?? "all",
+                                             activities: act, lots: lots,
+                                             assets: assets, prices: prices)
+    }
+
+    /// 账户组合历史快照（nil = 全部账户合并）
+    public func portfolioHistory(accountID: String? = nil) -> [PortfolioSnapshot] {
+        let act = activities.filter {
+            $0.status == "POSTED" && (accountID == nil || $0.accountID == accountID)
+        }
+        var prices: [String: Double] = [:]
+        for (id, q) in quotes {
+            prices[id] = q.price
+        }
+        return HistoryCalculator.snapshots(accountID: accountID ?? "all",
+                                           activities: act, assets: assets, prices: prices)
+    }
+
+    /// 已实现盈亏明细（某账户或全部）
+    public func disposals(accountID: String? = nil) -> [LotDisposal] {
+        let act = activities.filter {
+            $0.status == "POSTED" && (accountID == nil || $0.accountID == accountID)
+        }
+        return LotEngine.computeLots(activities: act).disposals
+    }
+
+    /// 拉取持仓标的行情（对齐 refreshQuotes：自选 + 持仓）
+    public func refreshPortfolioQuotes() async {
+        let symbols = Set(
+            positions().map { $0.asset.symbol } + watchlist.map { $0.symbol }
+        )
+        guard !symbols.isEmpty else { return }
+        do {
+            let fresh = try await registry.fetchQuotes(for: Array(symbols))
+            var merged = quotes
+            for q in fresh {
+                merged[q.symbol.id] = q
+            }
+            quotes = merged
+        } catch {
+            // 静默失败，保留旧缓存
+        }
     }
 }
