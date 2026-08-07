@@ -6,8 +6,7 @@ struct TectonicApp: App {
     @StateObject private var appState: AppState
 
     init() {
-        // 注册 Tabler Icons 字体（设计系统图标）
-        TectonicIcon.registerFont()
+        // 图标系统为矢量自绘（Lucide Shape），无需字体注册
         let db = try! AppDatabase.makeDefault()
         _appState = StateObject(wrappedValue: AppState(db: db))
     }

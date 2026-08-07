@@ -1,192 +1,606 @@
 import SwiftUI
-import CoreText
-import AppKit
 
-// MARK: - Tabler Icons 字体集成（开源线性图标集，MIT License）
+// MARK: - Tectonic 图标系统（Lucide 开源线性图标，ISC License）
+// 矢量自绘：SVG path → SwiftUI Shape，stroke 渲染（2pt, round cap/join），不依赖字体文件
 
-/// 图标枚举：case 名 -> Tabler Unicode 码点
+/// 图标枚举（case 名与业务代码一致）
 enum TectonicIcon: String, CaseIterable {
-    case activity = "\u{ED23}"
-    case adjustments = "\u{EA03}"
-    case alertTriangle = "\u{EA06}"
-    case arrowDown = "\u{EA16}"
-    case arrowUp = "\u{EA25}"
-    case arrowsLeftRight = "\u{EDB0}"
-    case arrowsMove = "\u{F22F}"
-    case arrowsSort = "\u{EB5A}"
-    case arrowsUpDown = "\u{EDB6}"
-    case award = "\u{EA2C}"
-    case bell = "\u{EA35}"
-    case bolt = "\u{EA38}"
-    case bookmark = "\u{EA3A}"
-    case borderAll = "\u{EA3B}"
-    case box = "\u{EA45}"
-    case braces = "\u{EBCC}"
-    case briefcase = "\u{EA46}"
-    case brush = "\u{EBB8}"
-    case building = "\u{EA4F}"
-    case buildingBank = "\u{EBE2}"
-    case buildingCommunity = "\u{EBF6}"
-    case buildingSkyscraper = "\u{EC39}"
-    case bulb = "\u{EA51}"
-    case calculator = "\u{EB80}"
-    case calendar = "\u{EA53}"
-    case calendarEvent = "\u{EA52}"
-    case calendarPlus = "\u{EBBA}"
-    case calendarStats = "\u{EE20}"
-    case calendarTime = "\u{EE21}"
-    case candle = "\u{EFC6}"
-    case chartArea = "\u{EA58}"
-    case chartBar = "\u{EA59}"
-    case chartDonut = "\u{EA5B}"
-    case chartDots = "\u{EE2F}"
-    case chartLine = "\u{EA5C}"
-    case chartPie = "\u{EA5D}"
-    case check = "\u{EA5E}"
-    case chevronDown = "\u{EA5F}"
-    case chevronLeft = "\u{EA60}"
-    case chevronRight = "\u{EA61}"
-    case circle = "\u{EA6B}"
-    case circleCheck = "\u{EA67}"
-    case circleHalf = "\u{EE3F}"
-    case circlePlus = "\u{EA69}"
-    case circleX = "\u{EA6A}"
-    case clock = "\u{EA70}"
-    case clock2 = "\u{F099}"
-    case clockExclamation = "\u{F847}"
-    case cloud = "\u{EA76}"
-    case code = "\u{EA77}"
-    case coin = "\u{EB82}"
-    case coins = "\u{F65D}"
-    case columns = "\u{EB83}"
-    case crown = "\u{ED12}"
-    case cube = "\u{FA97}"
-    case currencyBitcoin = "\u{EBAB}"
-    case currencyDollar = "\u{EB84}"
-    case currencyYen = "\u{EBAE}"
-    case currentLocation = "\u{ECEF}"
-    case dashboard = "\u{EA87}"
-    case database = "\u{EA88}"
-    case dots = "\u{EA95}"
-    case download = "\u{EA96}"
-    case edit = "\u{EA98}"
-    case externalLink = "\u{EA99}"
-    case eye = "\u{EA9A}"
-    case fileText = "\u{EAA2}"
-    case filter = "\u{EAA5}"
-    case flag = "\u{EAA6}"
-    case flame = "\u{EC2C}"
-    case folder = "\u{EAAD}"
-    case gauge = "\u{EAB1}"
-    case gitBranch = "\u{EAB2}"
-    case globe = "\u{EAB9}"
-    case hash = "\u{EABC}"
-    case heart = "\u{EABE}"
-    case help = "\u{EABF}"
-    case history = "\u{EBEA}"
-    case home = "\u{EAC1}"
-    case inbox = "\u{EAC4}"
-    case infoCircle = "\u{EAC5}"
-    case key = "\u{EAC7}"
-    case lamp = "\u{EFAB}"
-    case language = "\u{EBBE}"
-    case layoutGrid = "\u{EDBA}"
-    case layoutList = "\u{EC14}"
-    case link = "\u{EADE}"
-    case list = "\u{EB6B}"
-    case listCheck = "\u{EB6A}"
-    case lock = "\u{EAE2}"
-    case lockOpen = "\u{EAE1}"
-    case mail = "\u{EAE5}"
-    case mapPin = "\u{EAE8}"
-    case maximize = "\u{EAEA}"
-    case menu = "\u{EAEB}"
-    case menu2 = "\u{EC42}"
-    case minimize = "\u{EAF1}"
-    case moon = "\u{EAF8}"
-    case mountain = "\u{EF97}"
-    case news = "\u{EAFD}"
-    case package = "\u{EAFF}"
-    case paint = "\u{EB00}"
-    case palette = "\u{EB01}"
-    case pencil = "\u{EB04}"
-    case percentage = "\u{ECF4}"
-    case phone = "\u{EB09}"
-    case pin = "\u{EC9C}"
-    case plus = "\u{EB0B}"
-    case point = "\u{EB0C}"
-    case pointFilled = "\u{F698}"
-    case questionMark = "\u{EC9D}"
-    case quote = "\u{EFBE}"
-    case receipt = "\u{EDFD}"
-    case refresh = "\u{EB13}"
-    case robot = "\u{F00B}"
-    case scale = "\u{EBC2}"
-    case search = "\u{EB1C}"
-    case searchOff = "\u{F19C}"
-    case send = "\u{EB1E}"
-    case settings = "\u{EB20}"
-    case share = "\u{EB21}"
-    case shieldCheck = "\u{EB22}"
-    case sparkles = "\u{F6D7}"
-    case square = "\u{EB2C}"
-    case stack = "\u{EB2D}"
-    case star = "\u{EB2E}"
-    case starFilled = "\u{F6A6}"
-    case sun = "\u{EB30}"
-    case tag = "\u{10096}"
-    case target = "\u{EB35}"
-    case terminal2 = "\u{EBEF}"
-    case toggleLeft = "\u{EB3E}"
-    case toggleRight = "\u{EB3F}"
-    case trash = "\u{EB41}"
-    case trendingDown = "\u{EB42}"
-    case trendingUp = "\u{EB43}"
-    case wallet = "\u{EB75}"
-    case waveSine = "\u{ECD4}"
-    case wifiOff = "\u{ECFA}"
-    case world = "\u{EB54}"
-    case x = "\u{EB55}"
-    case zoomIn = "\u{EB56}"
-    case zoomOut = "\u{EB57}"
+    case activity
+    case adjustments
+    case alertTriangle
+    case arrowDown
+    case arrowUp
+    case arrowsLeftRight
+    case arrowsMove
+    case arrowsSort
+    case arrowsUpDown
+    case award
+    case bell
+    case bolt
+    case bookmark
+    case box
+    case braces
+    case briefcase
+    case brush
+    case building
+    case buildingBank
+    case buildingCommunity
+    case buildingSkyscraper
+    case bulb
+    case calculator
+    case calendar
+    case calendarEvent
+    case calendarPlus
+    case calendarStats
+    case calendarTime
+    case candle
+    case chartArea
+    case chartBar
+    case chartDonut
+    case chartDots
+    case chartLine
+    case chartPie
+    case check
+    case chevronDown
+    case chevronLeft
+    case chevronRight
+    case circle
+    case circleCheck
+    case circlePlus
+    case circleX
+    case clock
+    case clock2
+    case clockExclamation
+    case cloud
+    case code
+    case coin
+    case coins
+    case columns
+    case crown
+    case cube
+    case currencyBitcoin
+    case currencyDollar
+    case currentLocation
+    case database
+    case dots
+    case download
+    case edit
+    case externalLink
+    case eye
+    case fileText
+    case filter
+    case flag
+    case flame
+    case folder
+    case gauge
+    case gitBranch
+    case globe
+    case heart
+    case home
+    case inbox
+    case infoCircle
+    case key
+    case lamp
+    case language
+    case layoutList
+    case link
+    case list
+    case listCheck
+    case lock
+    case lockOpen
+    case mail
+    case mapPin
+    case maximize
+    case menu
+    case menu2
+    case minimize
+    case moon
+    case mountain
+    case news
+    case package
+    case paint
+    case palette
+    case pencil
+    case percentage
+    case phone
+    case pin
+    case plus
+    case point
+    case pointFilled
+    case quote
+    case receipt
+    case refresh
+    case robot
+    case scale
+    case search
+    case searchOff
+    case send
+    case settings
+    case share
+    case shieldCheck
+    case sparkles
+    case stack
+    case star
+    case starFilled
+    case sun
+    case tag
+    case target
+    case terminal2
+    case toggleLeft
+    case toggleRight
+    case trash
+    case trendingDown
+    case trendingUp
+    case wallet
+    case wifiOff
+    case world
+    case x
+    case zoomIn
+    case zoomOut
 }
 
-extension TectonicIcon {
-    /// 注册 Tabler 字体（App 启动时调用一次）
-    @discardableResult
-    static func registerFont() -> Bool {
-        guard let url = Bundle.main.url(forResource: "tabler-icons", withExtension: "ttf") else {
-            print("TectonicIcon: tabler-icons.ttf not found in bundle")
-            return false
+/// Lucide 图标 Shape：持有 SVG path 数据，缩放填充 viewBox 24×24
+struct LucideIconShape: Shape {
+    let paths: [String]
+
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        for d in paths {
+            p.addPath(SVGPathParser.parse(d))
         }
-        var error: Unmanaged<CFError>?
-        let registered = CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error)
-        if registered {
-            print("TectonicIcon: Tabler icons registered")
-            return true
-        }
-        if let err = error?.takeRetainedValue() {
-            let ns = err as Error as NSError
-            if ns.code == 105 { return true } // 已注册视为成功
-            print("TectonicIcon: registration failed \(ns)")
-        } else {
-            print("TectonicIcon: registration failed (unknown)")
-        }
-        return false
+        // 24x24 viewBox → 目标 rect
+        let scale = min(rect.width / 24.0, rect.height / 24.0)
+        let x = rect.midX - 12 * scale
+        let y = rect.midY - 12 * scale
+        return p.applying(CGAffineTransform(scaleX: scale, y: scale).translatedBy(x: x / scale, y: y / scale))
     }
 }
 
-/// 图标视图：用 Tabler 字体渲染，尺寸/颜色可调
+/// 图标视图：Shape stroke 渲染，尺寸/颜色可调
 struct TectonicIconView: View {
     let icon: TectonicIcon
     var size: CGFloat = 16
     var color: Color = .primary
+    var strokeWidth: CGFloat = 2
 
     var body: some View {
-        Text(icon.rawValue)
-            .font(.custom("tabler-icons", size: size))
-            .foregroundStyle(color)
-            .frame(width: size + 2, height: size + 2)
+        LucideIconShape(paths: icon.paths)
+            .stroke(color, style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round, lineJoin: .round))
+            .frame(width: size, height: size)
             .accessibilityHidden(true)
+    }
+}
+
+extension TectonicIcon {
+    /// 每个图标的 SVG path 数据（24x24 viewBox）
+    var paths: [String] {
+        switch self {
+        case .activity:
+            ["M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"]
+        case .adjustments:
+            ["M10 5H3", "M12 19H3", "M14 3v4", "M16 17v4", "M21 12h-9", "M21 19h-5", "M21 5h-7", "M8 10v4", "M8 12H3"]
+        case .alertTriangle:
+            ["m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3", "M12 9v4", "M12 17h.01"]
+        case .arrowDown:
+            ["M12 5v14", "m19 12-7 7-7-7"]
+        case .arrowUp:
+            ["m5 12 7-7 7 7", "M12 19V5"]
+        case .arrowsLeftRight:
+            ["M8 3 4 7l4 4", "M4 7h16", "m16 21 4-4-4-4", "M20 17H4"]
+        case .arrowsMove:
+            ["M12 2v20", "m15 19-3 3-3-3", "m19 9 3 3-3 3", "M2 12h20", "m5 9-3 3 3 3", "m9 5 3-3 3 3"]
+        case .arrowsSort:
+            ["m21 16-4 4-4-4", "M17 20V4", "m3 8 4-4 4 4", "M7 4v16"]
+        case .arrowsUpDown:
+            ["m21 16-4 4-4-4", "M17 20V4", "m3 8 4-4 4 4", "M7 4v16"]
+        case .award:
+            ["m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526", "M 6.0 8.0 C 6.0 4.6861999999999995 8.6862 2.0 12.0 2.0 C 15.3138 2.0 18.0 4.6861999999999995 18.0 8.0 C 18.0 11.3138 15.3138 14.0 12.0 14.0 C 8.6862 14.0 6.0 11.3138 6.0 8.0 Z"]
+        case .bell:
+            ["M10.268 21a2 2 0 0 0 3.464 0", "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"]
+        case .bolt:
+            ["M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"]
+        case .bookmark:
+            ["M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"]
+        case .box:
+            ["M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z", "m3.3 7 8.7 5 8.7-5", "M12 22V12"]
+        case .braces:
+            ["M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1", "M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"]
+        case .briefcase:
+            ["M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"]
+        case .brush:
+            ["m14.622 17.897-10.68-2.913", "M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z", "M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"]
+        case .building:
+            ["M12 10h.01", "M12 14h.01", "M12 6h.01", "M16 10h.01", "M16 14h.01", "M16 6h.01", "M8 10h.01", "M8 14h.01", "M8 6h.01", "M9 22v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3", "M 4.0 2.0 L 20.0 2.0 L 20.0 22.0 L 4.0 22.0 Z"]
+        case .buildingBank:
+            ["M10 18v-7", "M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z", "M14 18v-7", "M18 18v-7", "M3 22h18", "M6 18v-7"]
+        case .buildingCommunity:
+            ["M12 10h.01", "M12 14h.01", "M12 6h.01", "M16 10h.01", "M16 14h.01", "M16 6h.01", "M8 10h.01", "M8 14h.01", "M8 6h.01", "M9 22v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3", "M 4.0 2.0 L 20.0 2.0 L 20.0 22.0 L 4.0 22.0 Z"]
+        case .buildingSkyscraper:
+            ["M10 12h4", "M10 8h4", "M14 21v-3a2 2 0 0 0-4 0v3", "M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2", "M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"]
+        case .bulb:
+            ["M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5", "M9 18h6", "M10 22h4"]
+        case .calculator:
+            ["M16 10h.01", "M12 10h.01", "M8 10h.01", "M12 14h.01", "M8 14h.01", "M12 18h.01", "M8 18h.01"]
+        case .calendar:
+            ["M8 2v3", "M16 2v3", "M3 9h18", "M 3.0 3.0 L 21.0 3.0 L 21.0 21.0 L 3.0 21.0 Z"]
+        case .calendarEvent:
+            ["M8 2v3", "M16 2v3", "M3 9h18", "M8 13h.01", "M12 13h.01", "M16 13h.01", "M8 17h.01", "M12 17h.01", "M16 17h.01", "M 3.0 3.0 L 21.0 3.0 L 21.0 21.0 L 3.0 21.0 Z"]
+        case .calendarPlus:
+            ["M16 18h6", "M16 2v3", "M19 15v6", "M21 11.5V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h8.3", "M3 9h18", "M8 2v3"]
+        case .calendarStats:
+            ["M16 2v3", "M3 9h18", "M8 2v3", "M17 13h-6", "M13 17H7", "M7 13h.01", "M17 17h.01", "M 3.0 3.0 L 21.0 3.0 L 21.0 21.0 L 3.0 21.0 Z"]
+        case .calendarTime:
+            ["M16 14v2.2l1.6 1", "M16 2v3", "M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338", "M3 9h5.859", "M8 2v3", "M 10.0 16.0 C 10.0 12.6862 12.6862 10.0 16.0 10.0 C 19.3138 10.0 22.0 12.6862 22.0 16.0 C 22.0 19.3138 19.3138 22.0 16.0 22.0 C 12.6862 22.0 10.0 19.3138 10.0 16.0 Z"]
+        case .candle:
+            ["M16 7h6v6", "m22 7-8.5 8.5-5-5L2 17"]
+        case .chartArea:
+            ["M3 3v16a2 2 0 0 0 2 2h16", "M7 11.207a.5.5 0 0 1 .146-.353l2-2a.5.5 0 0 1 .708 0l3.292 3.292a.5.5 0 0 0 .708 0l4.292-4.292a.5.5 0 0 1 .854.353V16a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z"]
+        case .chartBar:
+            ["M3 3v16a2 2 0 0 0 2 2h16", "M7 16h8", "M7 11h12", "M7 6h3"]
+        case .chartDonut:
+            ["M20.5 10a2.5 2.5 0 0 1-2.4-3H18a2.95 2.95 0 0 1-2.6-4.4 10 10 0 1 0 6.3 7.1c-.3.2-.8.3-1.2.3", "M 9.0 12.0 C 9.0 10.3431 10.3431 9.0 12.0 9.0 C 13.6569 9.0 15.0 10.3431 15.0 12.0 C 15.0 13.6569 13.6569 15.0 12.0 15.0 C 10.3431 15.0 9.0 13.6569 9.0 12.0 Z"]
+        case .chartDots:
+            ["M3 3v16a2 2 0 0 0 2 2h16", "M 7.0 7.5 C 7.0 7.22385 7.22385 7.0 7.5 7.0 C 7.77615 7.0 8.0 7.22385 8.0 7.5 C 8.0 7.77615 7.77615 8.0 7.5 8.0 C 7.22385 8.0 7.0 7.77615 7.0 7.5 Z", "M 18.0 5.5 C 18.0 5.22385 18.22385 5.0 18.5 5.0 C 18.77615 5.0 19.0 5.22385 19.0 5.5 C 19.0 5.77615 18.77615 6.0 18.5 6.0 C 18.22385 6.0 18.0 5.77615 18.0 5.5 Z", "M 11.0 11.5 C 11.0 11.22385 11.22385 11.0 11.5 11.0 C 11.77615 11.0 12.0 11.22385 12.0 11.5 C 12.0 11.77615 11.77615 12.0 11.5 12.0 C 11.22385 12.0 11.0 11.77615 11.0 11.5 Z", "M 7.0 16.5 C 7.0 16.22385 7.22385 16.0 7.5 16.0 C 7.77615 16.0 8.0 16.22385 8.0 16.5 C 8.0 16.77615 7.77615 17.0 7.5 17.0 C 7.22385 17.0 7.0 16.77615 7.0 16.5 Z", "M 17.0 14.5 C 17.0 14.22385 17.22385 14.0 17.5 14.0 C 17.77615 14.0 18.0 14.22385 18.0 14.5 C 18.0 14.77615 17.77615 15.0 17.5 15.0 C 17.22385 15.0 17.0 14.77615 17.0 14.5 Z"]
+        case .chartLine:
+            ["M3 3v16a2 2 0 0 0 2 2h16", "m19 9-5 5-4-4-3 3"]
+        case .chartPie:
+            ["M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z", "M21.21 15.89A10 10 0 1 1 8 2.83"]
+        case .check:
+            ["M20 6 9 17l-5-5"]
+        case .chevronDown:
+            ["m6 9 6 6 6-6"]
+        case .chevronLeft:
+            ["m15 18-6-6 6-6"]
+        case .chevronRight:
+            ["m9 18 6-6-6-6"]
+        case .circle:
+            ["M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .circleCheck:
+            ["m9 12 2 2 4-4", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .circlePlus:
+            ["M8 12h8", "M12 8v8", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .circleX:
+            ["m15 9-6 6", "m9 9 6 6", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .clock:
+            ["M12 6v6l4 2", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .clock2:
+            ["M12 6v6l4-2", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .clockExclamation:
+            ["M12 6v6l4 2", "M20 12v5", "M20 21h.01", "M21.25 8.2A10 10 0 1 0 16 21.16"]
+        case .cloud:
+            ["M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"]
+        case .code:
+            ["m16 18 6-6-6-6", "m8 6-6 6 6 6"]
+        case .coin:
+            ["M13.744 17.736a6 6 0 1 1-7.48-7.48", "M15 6h1v4", "m6.134 14.768.866-.5 2 3.464", "M 10.0 8.0 C 10.0 4.6861999999999995 12.6862 2.0 16.0 2.0 C 19.3138 2.0 22.0 4.6861999999999995 22.0 8.0 C 22.0 11.3138 19.3138 14.0 16.0 14.0 C 12.6862 14.0 10.0 11.3138 10.0 8.0 Z"]
+        case .coins:
+            ["M13.744 17.736a6 6 0 1 1-7.48-7.48", "M15 6h1v4", "m6.134 14.768.866-.5 2 3.464", "M 10.0 8.0 C 10.0 4.6861999999999995 12.6862 2.0 16.0 2.0 C 19.3138 2.0 22.0 4.6861999999999995 22.0 8.0 C 22.0 11.3138 19.3138 14.0 16.0 14.0 C 12.6862 14.0 10.0 11.3138 10.0 8.0 Z"]
+        case .columns:
+            ["M12 3v18"]
+        case .crown:
+            ["M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z", "M5 21h14"]
+        case .cube:
+            ["M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z", "m3.3 7 8.7 5 8.7-5", "M12 22V12"]
+        case .currencyBitcoin:
+            ["M11.767 19.089c4.924.868 6.14-6.025 1.216-6.894m-1.216 6.894L5.86 18.047m5.908 1.042-.347 1.97m1.563-8.864c4.924.869 6.14-6.025 1.215-6.893m-1.215 6.893-3.94-.694m5.155-6.2L8.29 4.26m5.908 1.042.348-1.97M7.48 20.364l3.126-17.727"]
+        case .currencyDollar:
+            ["M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8", "M12 18V6", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .currentLocation:
+            ["M 5.0 12.0 C 5.0 8.1339 8.1339 5.0 12.0 5.0 C 15.8661 5.0 19.0 8.1339 19.0 12.0 C 19.0 15.8661 15.8661 19.0 12.0 19.0 C 8.1339 19.0 5.0 15.8661 5.0 12.0 Z", "M 9.0 12.0 C 9.0 10.3431 10.3431 9.0 12.0 9.0 C 13.6569 9.0 15.0 10.3431 15.0 12.0 C 15.0 13.6569 13.6569 15.0 12.0 15.0 C 10.3431 15.0 9.0 13.6569 9.0 12.0 Z"]
+        case .database:
+            ["M3 5V19A9 3 0 0 0 21 19V5", "M3 12A9 3 0 0 0 21 12"]
+        case .dots:
+            ["M 11.0 12.0 C 11.0 11.4477 11.4477 11.0 12.0 11.0 C 12.5523 11.0 13.0 11.4477 13.0 12.0 C 13.0 12.5523 12.5523 13.0 12.0 13.0 C 11.4477 13.0 11.0 12.5523 11.0 12.0 Z", "M 18.0 12.0 C 18.0 11.4477 18.4477 11.0 19.0 11.0 C 19.5523 11.0 20.0 11.4477 20.0 12.0 C 20.0 12.5523 19.5523 13.0 19.0 13.0 C 18.4477 13.0 18.0 12.5523 18.0 12.0 Z", "M 4.0 12.0 C 4.0 11.4477 4.4477 11.0 5.0 11.0 C 5.5523 11.0 6.0 11.4477 6.0 12.0 C 6.0 12.5523 5.5523 13.0 5.0 13.0 C 4.4477 13.0 4.0 12.5523 4.0 12.0 Z"]
+        case .download:
+            ["M12 15V3", "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", "m7 10 5 5 5-5"]
+        case .edit:
+            ["M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7", "M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"]
+        case .externalLink:
+            ["M15 3h6v6", "M10 14 21 3", "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"]
+        case .eye:
+            ["M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0", "M 9.0 12.0 C 9.0 10.3431 10.3431 9.0 12.0 9.0 C 13.6569 9.0 15.0 10.3431 15.0 12.0 C 15.0 13.6569 13.6569 15.0 12.0 15.0 C 10.3431 15.0 9.0 13.6569 9.0 12.0 Z"]
+        case .fileText:
+            ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8"]
+        case .filter:
+            ["M2 5h20", "M6 12h12", "M9 19h6"]
+        case .flag:
+            ["M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"]
+        case .flame:
+            ["M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"]
+        case .folder:
+            ["M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"]
+        case .gauge:
+            ["m12 14 4-4", "M3.34 19a10 10 0 1 1 17.32 0"]
+        case .gitBranch:
+            ["M15 6a9 9 0 0 0-9 9V3", "M 15.0 6.0 C 15.0 4.3431 16.3431 3.0 18.0 3.0 C 19.6569 3.0 21.0 4.3431 21.0 6.0 C 21.0 7.6569 19.6569 9.0 18.0 9.0 C 16.3431 9.0 15.0 7.6569 15.0 6.0 Z", "M 3.0 18.0 C 3.0 16.3431 4.3431 15.0 6.0 15.0 C 7.6569 15.0 9.0 16.3431 9.0 18.0 C 9.0 19.6569 7.6569 21.0 6.0 21.0 C 4.3431 21.0 3.0 19.6569 3.0 18.0 Z"]
+        case .globe:
+            ["M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .heart:
+            ["M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5"]
+        case .home:
+            ["M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8", "M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"]
+        case .inbox:
+            ["M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"]
+        case .infoCircle:
+            ["M12 16v-4", "M12 8h.01", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .key:
+            ["M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z", "M 16.0 7.5 C 16.0 7.22385 16.22385 7.0 16.5 7.0 C 16.77615 7.0 17.0 7.22385 17.0 7.5 C 17.0 7.77615 16.77615 8.0 16.5 8.0 C 16.22385 8.0 16.0 7.77615 16.0 7.5 Z"]
+        case .lamp:
+            ["M12 12v6", "M4.077 10.615A1 1 0 0 0 5 12h14a1 1 0 0 0 .923-1.385l-3.077-7.384A2 2 0 0 0 15 2H9a2 2 0 0 0-1.846 1.23Z", "M8 20a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1z"]
+        case .language:
+            ["m5 8 6 6", "m4 14 6-6 2-3", "M2 5h12", "M7 2h1", "m22 22-5-10-5 10", "M14 18h6"]
+        case .layoutList:
+            ["M3 5h.01", "M3 12h.01", "M3 19h.01", "M8 5h13", "M8 12h13", "M8 19h13"]
+        case .link:
+            ["M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71", "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"]
+        case .list:
+            ["M3 5h.01", "M3 12h.01", "M3 19h.01", "M8 5h13", "M8 12h13", "M8 19h13"]
+        case .listCheck:
+            ["M13 5h8", "M13 12h8", "M13 19h8", "m3 17 2 2 4-4", "m3 7 2 2 4-4"]
+        case .lock:
+            ["M7 11V7a5 5 0 0 1 10 0v4"]
+        case .lockOpen:
+            ["M7 11V7a5 5 0 0 1 9.9-1"]
+        case .mail:
+            ["m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7", "M 2.0 4.0 L 22.0 4.0 L 22.0 20.0 L 2.0 20.0 Z"]
+        case .mapPin:
+            ["M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0", "M 9.0 10.0 C 9.0 8.3431 10.3431 7.0 12.0 7.0 C 13.6569 7.0 15.0 8.3431 15.0 10.0 C 15.0 11.6569 13.6569 13.0 12.0 13.0 C 10.3431 13.0 9.0 11.6569 9.0 10.0 Z"]
+        case .maximize:
+            ["M8 3H5a2 2 0 0 0-2 2v3", "M21 8V5a2 2 0 0 0-2-2h-3", "M3 16v3a2 2 0 0 0 2 2h3", "M16 21h3a2 2 0 0 0 2-2v-3"]
+        case .menu:
+            ["M4 5h16", "M4 12h16", "M4 19h16"]
+        case .menu2:
+            ["M4 5h16", "M4 12h16", "M4 19h16"]
+        case .minimize:
+            ["M8 3v3a2 2 0 0 1-2 2H3", "M21 8h-3a2 2 0 0 1-2-2V3", "M3 16h3a2 2 0 0 1 2 2v3", "M16 21v-3a2 2 0 0 1 2-2h3"]
+        case .moon:
+            ["M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"]
+        case .mountain:
+            ["m8 3 4 8 5-5 5 15H2L8 3z"]
+        case .news:
+            ["M15 18h-5", "M18 14h-8", "M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2"]
+        case .package:
+            ["M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z", "M12 22V12", "m7.5 4.27 9 5.15"]
+        case .paint:
+            ["m14.622 17.897-10.68-2.913", "M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z", "M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"]
+        case .palette:
+            ["M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z", "M 13.0 6.5 C 13.0 6.22385 13.22385 6.0 13.5 6.0 C 13.77615 6.0 14.0 6.22385 14.0 6.5 C 14.0 6.77615 13.77615 7.0 13.5 7.0 C 13.22385 7.0 13.0 6.77615 13.0 6.5 Z", "M 17.0 10.5 C 17.0 10.22385 17.22385 10.0 17.5 10.0 C 17.77615 10.0 18.0 10.22385 18.0 10.5 C 18.0 10.77615 17.77615 11.0 17.5 11.0 C 17.22385 11.0 17.0 10.77615 17.0 10.5 Z", "M 6.0 12.5 C 6.0 12.22385 6.22385 12.0 6.5 12.0 C 6.77615 12.0 7.0 12.22385 7.0 12.5 C 7.0 12.77615 6.77615 13.0 6.5 13.0 C 6.22385 13.0 6.0 12.77615 6.0 12.5 Z", "M 8.0 7.5 C 8.0 7.22385 8.22385 7.0 8.5 7.0 C 8.77615 7.0 9.0 7.22385 9.0 7.5 C 9.0 7.77615 8.77615 8.0 8.5 8.0 C 8.22385 8.0 8.0 7.77615 8.0 7.5 Z"]
+        case .pencil:
+            ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"]
+        case .percentage:
+            ["M 4.0 6.5 C 4.0 5.11925 5.11925 4.0 6.5 4.0 C 7.88075 4.0 9.0 5.11925 9.0 6.5 C 9.0 7.88075 7.88075 9.0 6.5 9.0 C 5.11925 9.0 4.0 7.88075 4.0 6.5 Z", "M 15.0 17.5 C 15.0 16.11925 16.11925 15.0 17.5 15.0 C 18.88075 15.0 20.0 16.11925 20.0 17.5 C 20.0 18.88075 18.88075 20.0 17.5 20.0 C 16.11925 20.0 15.0 18.88075 15.0 17.5 Z"]
+        case .phone:
+            ["M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"]
+        case .pin:
+            ["M12 17v5", "M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"]
+        case .plus:
+            ["M5 12h14", "M12 5v14"]
+        case .point:
+            ["M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z", "M 11.0 12.0 C 11.0 11.4477 11.4477 11.0 12.0 11.0 C 12.5523 11.0 13.0 11.4477 13.0 12.0 C 13.0 12.5523 12.5523 13.0 12.0 13.0 C 11.4477 13.0 11.0 12.5523 11.0 12.0 Z"]
+        case .pointFilled:
+            ["M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0", "M 9.0 10.0 C 9.0 8.3431 10.3431 7.0 12.0 7.0 C 13.6569 7.0 15.0 8.3431 15.0 10.0 C 15.0 11.6569 13.6569 13.0 12.0 13.0 C 10.3431 13.0 9.0 11.6569 9.0 10.0 Z"]
+        case .quote:
+            ["M16 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z", "M5 3a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2 1 1 0 0 1 1 1v1a2 2 0 0 1-2 2 1 1 0 0 0-1 1v2a1 1 0 0 0 1 1 6 6 0 0 0 6-6V5a2 2 0 0 0-2-2z"]
+        case .receipt:
+            ["M12 17V7", "M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8", "M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"]
+        case .refresh:
+            ["M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8", "M21 3v5h-5", "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16", "M8 16H3v5"]
+        case .robot:
+            ["M12 8V4H8", "M2 14h2", "M20 14h2", "M15 13v2", "M9 13v2"]
+        case .scale:
+            ["M12 3v18", "m19 8 3 8a5 5 0 0 1-6 0zV7", "M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1", "m5 8 3 8a5 5 0 0 1-6 0zV7", "M7 21h10"]
+        case .search:
+            ["m21 21-4.34-4.34", "M 3.0 11.0 C 3.0 6.5816 6.5816 3.0 11.0 3.0 C 15.4184 3.0 19.0 6.5816 19.0 11.0 C 19.0 15.4184 15.4184 19.0 11.0 19.0 C 6.5816 19.0 3.0 15.4184 3.0 11.0 Z"]
+        case .searchOff:
+            ["m13.5 8.5-5 5", "m8.5 8.5 5 5", "m21 21-4.3-4.3", "M 3.0 11.0 C 3.0 6.5816 6.5816 3.0 11.0 3.0 C 15.4184 3.0 19.0 6.5816 19.0 11.0 C 19.0 15.4184 15.4184 19.0 11.0 19.0 C 6.5816 19.0 3.0 15.4184 3.0 11.0 Z"]
+        case .send:
+            ["M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z", "m21.854 2.147-10.94 10.939"]
+        case .settings:
+            ["M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915", "M 9.0 12.0 C 9.0 10.3431 10.3431 9.0 12.0 9.0 C 13.6569 9.0 15.0 10.3431 15.0 12.0 C 15.0 13.6569 13.6569 15.0 12.0 15.0 C 10.3431 15.0 9.0 13.6569 9.0 12.0 Z"]
+        case .share:
+            ["M 15.0 5.0 C 15.0 3.3430999999999997 16.3431 2.0 18.0 2.0 C 19.6569 2.0 21.0 3.3430999999999997 21.0 5.0 C 21.0 6.6569 19.6569 8.0 18.0 8.0 C 16.3431 8.0 15.0 6.6569 15.0 5.0 Z", "M 3.0 12.0 C 3.0 10.3431 4.3431 9.0 6.0 9.0 C 7.6569 9.0 9.0 10.3431 9.0 12.0 C 9.0 13.6569 7.6569 15.0 6.0 15.0 C 4.3431 15.0 3.0 13.6569 3.0 12.0 Z", "M 15.0 19.0 C 15.0 17.3431 16.3431 16.0 18.0 16.0 C 19.6569 16.0 21.0 17.3431 21.0 19.0 C 21.0 20.6569 19.6569 22.0 18.0 22.0 C 16.3431 22.0 15.0 20.6569 15.0 19.0 Z"]
+        case .shieldCheck:
+            ["M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z", "m9 12 2 2 4-4"]
+        case .sparkles:
+            ["M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z", "M20 2v4", "M22 4h-4", "M 2.0 20.0 C 2.0 18.8954 2.8954 18.0 4.0 18.0 C 5.1046 18.0 6.0 18.8954 6.0 20.0 C 6.0 21.1046 5.1046 22.0 4.0 22.0 C 2.8954 22.0 2.0 21.1046 2.0 20.0 Z"]
+        case .stack:
+            ["M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z", "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12", "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"]
+        case .star:
+            ["M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"]
+        case .starFilled:
+            ["M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"]
+        case .sun:
+            ["M12 2v2", "M12 20v2", "m4.93 4.93 1.41 1.41", "m17.66 17.66 1.41 1.41", "M2 12h2", "M20 12h2", "m6.34 17.66-1.41 1.41", "m19.07 4.93-1.41 1.41", "M 8.0 12.0 C 8.0 9.7908 9.7908 8.0 12.0 8.0 C 14.2092 8.0 16.0 9.7908 16.0 12.0 C 16.0 14.2092 14.2092 16.0 12.0 16.0 C 9.7908 16.0 8.0 14.2092 8.0 12.0 Z"]
+        case .tag:
+            ["M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z", "M 7.0 7.5 C 7.0 7.22385 7.22385 7.0 7.5 7.0 C 7.77615 7.0 8.0 7.22385 8.0 7.5 C 8.0 7.77615 7.77615 8.0 7.5 8.0 C 7.22385 8.0 7.0 7.77615 7.0 7.5 Z"]
+        case .target:
+            ["M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z", "M 6.0 12.0 C 6.0 8.6862 8.6862 6.0 12.0 6.0 C 15.3138 6.0 18.0 8.6862 18.0 12.0 C 18.0 15.3138 15.3138 18.0 12.0 18.0 C 8.6862 18.0 6.0 15.3138 6.0 12.0 Z", "M 10.0 12.0 C 10.0 10.8954 10.8954 10.0 12.0 10.0 C 13.1046 10.0 14.0 10.8954 14.0 12.0 C 14.0 13.1046 13.1046 14.0 12.0 14.0 C 10.8954 14.0 10.0 13.1046 10.0 12.0 Z"]
+        case .terminal2:
+            ["m7 11 2-2-2-2", "M11 13h4"]
+        case .toggleLeft:
+            ["M 6.0 12.0 C 6.0 10.3431 7.3431 9.0 9.0 9.0 C 10.6569 9.0 12.0 10.3431 12.0 12.0 C 12.0 13.6569 10.6569 15.0 9.0 15.0 C 7.3431 15.0 6.0 13.6569 6.0 12.0 Z"]
+        case .toggleRight:
+            ["M 12.0 12.0 C 12.0 10.3431 13.3431 9.0 15.0 9.0 C 16.6569 9.0 18.0 10.3431 18.0 12.0 C 18.0 13.6569 16.6569 15.0 15.0 15.0 C 13.3431 15.0 12.0 13.6569 12.0 12.0 Z"]
+        case .trash:
+            ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"]
+        case .trendingDown:
+            ["M3 3v16a2 2 0 0 0 2 2h16", "m19 9-5 5-4-4-3 3"]
+        case .trendingUp:
+            ["M3 3v16a2 2 0 0 0 2 2h16", "m19 9-5 5-4-4-3 3"]
+        case .wallet:
+            ["M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1", "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"]
+        case .wifiOff:
+            ["M12 20h.01", "M8.5 16.429a5 5 0 0 1 7 0", "M5 12.859a10 10 0 0 1 5.17-2.69", "M19 12.859a10 10 0 0 0-2.007-1.523", "M2 8.82a15 15 0 0 1 4.177-2.643", "M22 8.82a15 15 0 0 0-11.288-3.764", "m2 2 20 20"]
+        case .world:
+            ["M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20", "M 2.0 12.0 C 2.0 6.477 6.477 2.0 12.0 2.0 C 17.523 2.0 22.0 6.477 22.0 12.0 C 22.0 17.523 17.523 22.0 12.0 22.0 C 6.477 22.0 2.0 17.523 2.0 12.0 Z"]
+        case .x:
+            ["M18 6 6 18", "m6 6 12 12"]
+        case .zoomIn:
+            ["M 3.0 11.0 C 3.0 6.5816 6.5816 3.0 11.0 3.0 C 15.4184 3.0 19.0 6.5816 19.0 11.0 C 19.0 15.4184 15.4184 19.0 11.0 19.0 C 6.5816 19.0 3.0 15.4184 3.0 11.0 Z"]
+        case .zoomOut:
+            ["M 3.0 11.0 C 3.0 6.5816 6.5816 3.0 11.0 3.0 C 15.4184 3.0 19.0 6.5816 19.0 11.0 C 19.0 15.4184 15.4184 19.0 11.0 19.0 C 6.5816 19.0 3.0 15.4184 3.0 11.0 Z"]
+        }
+    }
+}
+
+// MARK: - 极简 SVG path 解析器（支持 M/L/C/Q/A/Z 命令，覆盖 Lucide 全部路径）
+
+enum SVGPathParser {
+    static func parse(_ d: String) -> Path {
+        var path = Path()
+        var current = CGPoint.zero
+        var start = CGPoint.zero
+        var lastControl: CGPoint?
+
+        // tokenize: 命令字母 + 数字
+        let tokens = tokenize(d)
+        var i = 0
+
+        func num() -> CGFloat? {
+            guard i < tokens.count else { return nil }
+            let tok = tokens[i]
+            i += 1
+            guard case .number(let v) = tok else { return nil }
+            return v
+        }
+
+        while i < tokens.count {
+            let tok = tokens[i]
+            i += 1
+            // 命令字符（最后一个元素是命令时忽略）
+            if tok.isCommand {
+                let cmd = tok.command
+                var continueCmd = true
+                while continueCmd {
+                    continueCmd = false
+                    switch cmd {
+                    case "M", "m":
+                        if let x = num(), let y = num() {
+                            let p = cmd == "M" ? CGPoint(x: x, y: y) : CGPoint(x: current.x + x, y: current.y + y)
+                            path.move(to: p)
+                            current = p
+                            start = p
+                        }
+                    case "L", "l":
+                        if let x = num(), let y = num() {
+                            let p = cmd == "L" ? CGPoint(x: x, y: y) : CGPoint(x: current.x + x, y: current.y + y)
+                            path.addLine(to: p)
+                            current = p
+                        }
+                    case "H", "h":
+                        if let x = num() {
+                            let p = CGPoint(x: cmd == "H" ? x : current.x + x, y: current.y)
+                            path.addLine(to: p)
+                            current = p
+                        }
+                    case "V", "v":
+                        if let y = num() {
+                            let p = CGPoint(x: current.x, y: cmd == "V" ? y : current.y + y)
+                            path.addLine(to: p)
+                            current = p
+                        }
+                    case "C", "c":
+                        if let x1 = num(), let y1 = num(), let x2 = num(), let y2 = num(), let x = num(), let y = num() {
+                            let c1 = cmd == "C" ? CGPoint(x: x1, y: y1) : CGPoint(x: current.x + x1, y: current.y + y1)
+                            let c2 = cmd == "C" ? CGPoint(x: x2, y: y2) : CGPoint(x: current.x + x2, y: current.y + y2)
+                            let p = cmd == "C" ? CGPoint(x: x, y: y) : CGPoint(x: current.x + x, y: current.y + y)
+                            path.addCurve(to: p, control1: c1, control2: c2)
+                            lastControl = c2
+                            current = p
+                        }
+                    case "S", "s":
+                        if let x2 = num(), let y2 = num(), let x = num(), let y = num() {
+                            let c1 = lastControl ?? current
+                            let c2 = cmd == "S" ? CGPoint(x: x2, y: y2) : CGPoint(x: current.x + x2, y: current.y + y2)
+                            let p = cmd == "S" ? CGPoint(x: x, y: y) : CGPoint(x: current.x + x, y: current.y + y)
+                            path.addCurve(to: p, control1: c1, control2: c2)
+                            lastControl = c2
+                            current = p
+                        }
+                    case "Q", "q":
+                        if let x1 = num(), let y1 = num(), let x = num(), let y = num() {
+                            let c = cmd == "Q" ? CGPoint(x: x1, y: y1) : CGPoint(x: current.x + x1, y: current.y + y1)
+                            let p = cmd == "Q" ? CGPoint(x: x, y: y) : CGPoint(x: current.x + x, y: current.y + y)
+                            path.addQuadCurve(to: p, control: c)
+                            lastControl = c
+                            current = p
+                        }
+                    case "T", "t":
+                        if let x = num(), let y = num() {
+                            let c = lastControl.map { CGPoint(x: 2 * current.x - $0.x, y: 2 * current.y - $0.y) } ?? current
+                            let p = cmd == "T" ? CGPoint(x: x, y: y) : CGPoint(x: current.x + x, y: current.y + y)
+                            path.addQuadCurve(to: p, control: c)
+                            lastControl = c
+                            current = p
+                        }
+                    case "A", "a":
+                        // 圆弧：用二次曲线近似（Lucide 圆弧较少，简化处理）
+                        if let rx = num(), let ry = num(), let rot = num(), let laf = num(), let sf = num(), let x = num(), let y = num() {
+                            let p = cmd == "A" ? CGPoint(x: x, y: y) : CGPoint(x: current.x + x, y: current.y + y)
+                            // 近似：直线 + 简单曲线
+                            let mid = CGPoint(x: (current.x + p.x) / 2, y: (current.y + p.y) / 2)
+                            path.addQuadCurve(to: p, control: mid)
+                            lastControl = nil
+                            current = p
+                        }
+                    case "Z", "z":
+                        path.closeSubpath()
+                        current = start
+                    default:
+                        break
+                    }
+                    // 同命令重复参数（如 M x y x y）
+                    if i < tokens.count && tokens[i].isNumber {
+                        continueCmd = true
+                    }
+                }
+            }
+        }
+        return path
+    }
+
+    // MARK: tokenizer
+
+    fileprivate enum Token {
+        case command(Character)
+        case number(CGFloat)
+        var isCommand: Bool {
+            if case .command = self { return true }
+            return false
+        }
+        var isNumber: Bool {
+            if case .number = self { return true }
+            return false
+        }
+        var command: Character {
+            if case .command(let c) = self { return c }
+            return " "
+        }
+    }
+
+    fileprivate static func tokenize(_ d: String) -> [Token] {
+        var tokens: [Token] = []
+        var numStr = ""
+        var hasNum = false
+        func flushNum() {
+            if hasNum, let v = Double(numStr) {
+                tokens.append(.number(CGFloat(v)))
+            }
+            numStr = ""
+            hasNum = false
+        }
+        for ch in d {
+            if "MmLlHhVvCcSsQqTtAaZz".contains(ch) {
+                flushNum()
+                tokens.append(.command(ch))
+            } else if ch.isNumber || ch == "." || ch == "-" || ch == "+" || ch == "e" || ch == "E" {
+                numStr.append(ch)
+                hasNum = true
+            } else if ch == " " || ch == "," {
+                flushNum()
+            }
+        }
+        flushNum()
+        return tokens
     }
 }
