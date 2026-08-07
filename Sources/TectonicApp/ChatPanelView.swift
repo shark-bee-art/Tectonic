@@ -2,7 +2,9 @@ import SwiftUI
 import TectonicIcons
 import CoreKit
 
-/// 底部悬浮 AI 问询对话框（玻璃质感 + Robinhood 设计语言一致）
+/// 底部悬浮 AI 问询对话框
+/// 设计语言：主流 AI 聊天产品（ChatGPT/Claude 风格）——
+/// 极简头部 / 全宽消息流（AI 靠左带头像、用户靠右）/ 大圆角输入框 + 圆形发送按钮 / 玻璃质感
 struct ChatPanelContext: Identifiable {
     let id = UUID()
     let title: String
@@ -28,25 +30,10 @@ struct ChatPanelView: View {
     private var ai: AISettings { app.aiSettings }
 
     var body: some View {
-        panel
-            .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
-            .onAppear {
-                // 自动发送初始问题（详情页底部对话框唤起）
-                if !didSendInitial, let q = context.initialQuestion, !q.isEmpty {
-                    didSendInitial = true
-                    send(q)
-                }
-            }
-    }
-
-    // MARK: 面板主体（玻璃质感，固定高度）
-
-    private var panel: some View {
         VStack(spacing: 0) {
             header
             DSDivider()
-            messagesList
-            DSDivider()
+            messageStream
             inputArea
         }
         .frame(width: 500, height: 340)
@@ -60,86 +47,81 @@ struct ChatPanelView: View {
                 .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
+        .onAppear {
+            if !didSendInitial, let q = context.initialQuestion, !q.isEmpty {
+                didSendInitial = true
+                send(q)
+            }
+        }
     }
 
-    // MARK: 头部（AI 标识 + 标题 + 模型 + 操作）
+    // MARK: 头部（极简：logo + 标题 + 模型，右侧关闭）
 
     private var header: some View {
         HStack(spacing: 10) {
-            // AI 标识（品牌色方块 + sparkles）
-            RoundedRectangle(cornerRadius: 8)
+            // AI logo（品牌色小方块）
+            RoundedRectangle(cornerRadius: 7)
                 .fill(DS.tradeButton)
-                .frame(width: 28, height: 28)
-                .overlay(TectonicIconView(icon: .sparkles, size: 13, color: .white))
-            VStack(alignment: .leading, spacing: 2) {
+                .frame(width: 26, height: 26)
+                .overlay(TectonicIconView(icon: .sparkles, size: 12, color: .white))
+            VStack(alignment: .leading, spacing: 1) {
                 Text(context.title)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13.5, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
-                HStack(spacing: 6) {
+                HStack(spacing: 5) {
                     Text(ai.model)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(DS.textTertiary)
                     if ai.webSearchEnabled {
-                        HStack(spacing: 3) {
-                            TectonicIconView(icon: .globe, size: 10, color: DS.accent)
+                        HStack(spacing: 2) {
+                            TectonicIconView(icon: .globe, size: 9, color: DS.accent)
                             Text(L10n.l("chat.webSearchOn"))
-                                .font(.system(size: 10))
+                                .font(.system(size: 9.5))
                                 .foregroundStyle(DS.accent)
                         }
                     }
                 }
             }
             Spacer()
-            // 清空对话
-            Button {
-                messages = []
-                searchedSources = []
-            } label: {
-                TectonicIconView(icon: .trash, size: 15, color: DS.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .help(L10n.l("chat.clear"))
-            // 关闭
             Button {
                 app.chatPanel = nil
             } label: {
-                TectonicIconView(icon: .x, size: 15, color: DS.textSecondary)
+                TectonicIconView(icon: .x, size: 14, color: DS.textSecondary)
+                    .frame(width: 26, height: 26)
+                    .background(
+                        RoundedRectangle(cornerRadius: 7)
+                            .fill(DS.bgHover)
+                    )
             }
             .buttonStyle(.plain)
             .keyboardShortcut(.cancelAction)
+            .help(L10n.l("nav.back"))
         }
-        .padding(12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
-    // MARK: 消息列表
+    // MARK: 消息流（全宽：AI 靠左带头像，用户靠右）
 
-    private var messagesList: some View {
+    private var messageStream: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 12) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     if messages.isEmpty {
-                        // 空状态（欢迎提示）
-                        VStack(spacing: 10) {
-                            TectonicIconView(icon: .sparkles, size: 32, color: DS.textTertiary)
-                            Text(context.subtitle)
-                                .font(.system(size: 13))
-                                .foregroundStyle(DS.textSecondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 30)
-                        }
-                        .padding(.top, 44)
+                        emptyState
                     }
                     ForEach(messages) { msg in
-                        chatBubble(msg)
+                        messageRow(msg)
                     }
                     if isThinking {
-                        thinkingIndicator
+                        thinkingRow
                             .id("thinking")
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
             .onChange(of: messages.count) { _, _ in
                 withAnimation { proxy.scrollTo(messages.last?.id ?? UUID(), anchor: .bottom) }
@@ -147,60 +129,74 @@ struct ChatPanelView: View {
         }
     }
 
-    /// 消息气泡（助手带头像）
-    private func chatBubble(_ msg: ChatMessage) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            if msg.role == "assistant" {
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(DS.tradeButton)
-                    .frame(width: 22, height: 22)
-                    .overlay(TectonicIconView(icon: .sparkles, size: 10, color: .white))
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(DS.tradeButton)
+                .frame(width: 40, height: 40)
+                .overlay(TectonicIconView(icon: .sparkles, size: 18, color: .white))
+            Text(context.title)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(DS.textPrimary)
+            Text(context.subtitle)
+                .font(.system(size: 12.5))
+                .foregroundStyle(DS.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 36)
+    }
+
+    /// 单条消息（全宽，无卡片气泡）
+    private func messageRow(_ msg: ChatMessage) -> some View {
+        let isUser = msg.role == "user"
+        return HStack(alignment: .top, spacing: 10) {
+            if !isUser {
+                aiAvatar(size: 22)
             }
-            VStack(alignment: .leading, spacing: 3) {
-                if msg.role == "assistant" {
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+                if !isUser {
                     Text("Tectonic AI")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 10.5, weight: .semibold))
                         .foregroundStyle(DS.textTertiary)
                 }
                 Text(msg.content)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13.5))
                     .foregroundStyle(DS.textPrimary)
+                    .lineSpacing(3)
                     .textSelection(.enabled)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(msg.role == "user"
-                                  ? DS.accent.opacity(0.13)
-                                  : DS.bgHover)
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(isUser ? DS.accent.opacity(0.12) : DS.bgHover.opacity(0.85))
                     )
-                    .frame(maxWidth: 320, alignment: msg.role == "user" ? .trailing : .leading)
+                    .frame(maxWidth: isUser ? 340 : 400, alignment: isUser ? .trailing : .leading)
             }
-            if msg.role == "user" {
-                Spacer()
+            if isUser {
+                Spacer(minLength: 0)
             }
         }
-        .frame(maxWidth: .infinity, alignment: msg.role == "user" ? .trailing : .leading)
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
     }
 
     // MARK: 思考指示
 
-    private var thinkingIndicator: some View {
-        HStack(spacing: 8) {
-            RoundedRectangle(cornerRadius: 6)
-                .fill(DS.tradeButton)
-                .frame(width: 22, height: 22)
-                .overlay(TectonicIconView(icon: .sparkles, size: 10, color: .white))
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L10n.l("common.thinking"))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(DS.textSecondary)
+    private var thinkingRow: some View {
+        HStack(alignment: .top, spacing: 10) {
+            aiAvatar(size: 22)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Tectonic AI")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(DS.textTertiary)
                 HStack(spacing: 4) {
                     ForEach(0..<3, id: \.self) { i in
                         Circle()
                             .fill(DS.textTertiary)
                             .frame(width: 5, height: 5)
                             .opacity(isThinking ? (i == 0 ? 1 : 0.3) : 0.3)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(Double(i) * 0.15), value: isThinking)
                     }
                 }
             }
@@ -208,65 +204,80 @@ struct ChatPanelView: View {
         }
     }
 
-    // MARK: 输入区
+    @ViewBuilder
+    private func aiAvatar(size: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: size * 0.28)
+            .fill(DS.tradeButton)
+            .frame(width: size, height: size)
+            .overlay(TectonicIconView(icon: .sparkles, size: size * 0.45, color: .white))
+    }
+
+    // MARK: 输入区（大圆角输入框 + 圆形发送按钮 + 轻量快捷问题）
 
     private var inputArea: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                // 快捷问题（贴输入框上方，DS 风格 chips）
-                ForEach(context.quickQuestions, id: \.0) { q in
-                    Button {
-                        send(q.1)
-                    } label: {
-                        Text(q.0)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(DS.accent)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(RoundedRectangle(cornerRadius: DS.radiusMedium).fill(DS.bgHover))
+        VStack(spacing: 8) {
+            // 快捷问题（轻量：一行小字 chips）
+            if !context.quickQuestions.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(context.quickQuestions, id: \.0) { q in
+                        Button {
+                            send(q.1)
+                        } label: {
+                            Text(q.0)
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundStyle(DS.textSecondary)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 3.5)
+                                .background(
+                                    Capsule().fill(DS.bgHover.opacity(0.9))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isThinking)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(isThinking)
-                }
-                Spacer()
-                // 联网搜索状态（默认开启）
-                if ai.webSearchEnabled {
-                    HStack(spacing: 3) {
-                        TectonicIconView(icon: .globe, size: 10, color: DS.accent)
-                        Text(L10n.l("chat.webSearchOn"))
-                            .font(.system(size: 10))
-                            .foregroundStyle(DS.accent)
+                    Spacer()
+                    if !searchedSources.isEmpty {
+                        Text("\(searchedSources.count) 源")
+                            .font(.system(size: 10).monospacedDigit())
+                            .foregroundStyle(DS.textTertiary)
                     }
-                    .help(L10n.l("chat.webSearchHint"))
-                }
-                if !searchedSources.isEmpty {
-                    Text("\(searchedSources.count) 源")
-                        .font(.system(size: 10).monospacedDigit())
-                        .foregroundStyle(DS.textTertiary)
                 }
             }
+
+            // 输入行
             HStack(spacing: 8) {
-                TextField(context.subtitle, text: $input, axis: .vertical)
+                TextField(L10n.l("chat.askHint"), text: $input, axis: .vertical)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .font(.system(size: 13.5))
+                    .lineLimit(1...4)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
                     .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(DS.bgHover)
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .fill(DS.bgHover.opacity(0.9))
                     )
                     .focused($inputFocused)
                     .onSubmit { send() }
+
+                // 圆形发送按钮
+                let canSend = !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isThinking
                 Button {
                     send()
                 } label: {
-                    TectonicIconView(icon: .send, size: 18, color: input.isEmpty || isThinking ? DS.textTertiary : DS.accent)
+                    Circle()
+                        .fill(canSend ? DS.tradeButton : DS.bgHover)
+                        .frame(width: 34, height: 34)
+                        .overlay(
+                            TectonicIconView(icon: .send, size: 14,
+                                             color: canSend ? .white : DS.textTertiary)
+                        )
                 }
                 .buttonStyle(.plain)
-                .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)
+                .disabled(!canSend)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
 
     // MARK: 发送
@@ -286,7 +297,6 @@ struct ChatPanelView: View {
         let provider = ai.provider
         let model = ai.model
         let key = ai.apiKey(for: provider)
-        // 固定适中思考深度 + 默认联网
         let effort = "medium"
         let webEnabled = true
         let feeds = app.store.newsFeeds
@@ -296,7 +306,6 @@ struct ChatPanelView: View {
 
         Task {
             defer { isThinking = false }
-            // 联网检索（默认开启）
             var webContext = ""
             if webEnabled {
                 let results = await WebSearchService.search(query: text, feeds: feeds,
