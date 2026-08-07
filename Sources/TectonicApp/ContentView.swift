@@ -1,192 +1,168 @@
 import SwiftUI
 import CoreKit
 
-/// 主界面：自绘三栏（TradingView 淡雅）
-/// 顶部栏（品牌区/搜索/操作） + 侧边栏 + 内容列 + 详情列
-/// 弃用 NavigationSplitView 系统渲染：自绘分割线、自绘选中态、可拖拽分栏
+/// 主界面：单栏 + 导航栈（Robinhood 结构，无三栏）
+/// 顶部 tab 栏（自选/行情/快讯/研报/财报/日历）→ 全宽列表 → 点击 push 全宽详情页（带返回）
 struct ContentView: View {
     @EnvironmentObject var app: AppState
-    /// 侧边栏宽度（拖拽实时更新 + UserDefaults 持久化）
-    @State private var sidebarWidth: CGFloat = 220
-    @State private var draggingSidebar = false
 
     var body: some View {
         VStack(spacing: 0) {
-            TopBar(sidebarWidth: sidebarWidth)
+            TopBar()
             DSDivider()
-            HStack(spacing: 0) {
-                // 侧边栏
-                SidebarView(width: sidebarWidth,
-                            onWidthChange: { newWidth in
-                                sidebarWidth = newWidth
-                                UserDefaults.standard.set(newWidth, forKey: "sidebar_width")
-                            },
-                            onDrag: { draggingSidebar = $0 })
-                    .frame(width: sidebarWidth)
-
-                DSDivider()
-
-                // 内容列
-                contentColumn
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                DSDivider()
-
-                // 详情列
-                detailColumn
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            // 主区域：详情优先（导航栈 push），否则当前 tab 列表
+            mainArea
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(DS.bgApp)
-        .onAppear {
-            app.onAppear()
-            sidebarWidth = CGFloat(UserDefaults.standard.double(forKey: "sidebar_width").isZero
-                                    ? 220 : UserDefaults.standard.double(forKey: "sidebar_width"))
+        .onAppear { app.onAppear() }
+    }
+
+    // MARK: 主区域（导航栈：详情 > 列表）
+
+    @ViewBuilder
+    private var mainArea: some View {
+        if let symbol = app.selectedSymbol, isSymbolTab {
+            DetailNavContainer(title: symbol.name) {
+                QuoteDetailView(symbol: symbol)
+                    .id(symbol.id)
+            }
+            .transition(.move(edge: .trailing).combined(with: .opacity))
+        } else if let item = app.selectedNews, isNewsTab {
+            DetailNavContainer(title: item.title) {
+                NewsDetailView(item: item)
+                    .id(item.id)
+            }
+            .transition(.move(edge: .trailing).combined(with: .opacity))
+        } else {
+            tabContent
+                .transition(.opacity)
         }
     }
 
-    // MARK: 内容列
-
-    private var contentColumn: some View {
-        Group {
-            switch app.selectedTab {
-            case .watchlist:
-                WatchlistView()
-            case .markets:
-                MarketsView()
-            case .newsFlash:
-                NewsListView(category: .flash)
-            case .newsResearch:
-                NewsListView(category: .research)
-            case .newsEarnings:
-                NewsListView(category: .earnings)
-            case .newsCalendar:
-                CalendarView()
-            case .newsFeed(let id):
-                NewsListView(category: app.store.newsFeeds.first { $0.id == id }?.category ?? .flash, sourceID: id)
-            }
+    private var isSymbolTab: Bool {
+        switch app.selectedTab {
+        case .watchlist, .markets: true
+        default: false
         }
-        .background(DS.bgPanel)
-        .transition(.opacity.combined(with: .identity))
-        .animation(.easeOut(duration: 0.15), value: app.selectedTab)
     }
 
-    // MARK: 详情列
-
-    private var detailColumn: some View {
-        Group {
-            switch app.selectedTab {
-            case .watchlist, .markets:
-                if let symbol = app.selectedSymbol {
-                    QuoteDetailView(symbol: symbol)
-                        .id(symbol.id)
-                } else {
-                    DSPlaceholder(icon: .chartLine,
-                                  title: L10n.l("placeholder.select"),
-                                  subtitle: L10n.l("placeholder.selectHint"))
-                }
-            case .newsFlash, .newsResearch, .newsEarnings, .newsCalendar, .newsFeed:
-                if let item = app.selectedNews {
-                    NewsDetailView(item: item)
-                        .id(item.id)
-                } else {
-                    DSPlaceholder(icon: .news,
-                                  title: L10n.l("placeholder.news"),
-                                  subtitle: L10n.l("placeholder.newsHint"))
-                }
-            }
+    private var isNewsTab: Bool {
+        switch app.selectedTab {
+        case .newsFlash, .newsResearch, .newsEarnings, .newsCalendar, .newsFeed: true
+        default: false
         }
-        .background(DS.bgApp)
+    }
+
+    // MARK: 当前 tab 内容（全宽列表）
+
+    @ViewBuilder
+    private var tabContent: some View {
+        switch app.selectedTab {
+        case .watchlist:
+            WatchlistView()
+        case .markets:
+            MarketsView()
+        case .newsFlash:
+            NewsListView(category: .flash)
+        case .newsResearch:
+            NewsListView(category: .research)
+        case .newsEarnings:
+            NewsListView(category: .earnings)
+        case .newsCalendar:
+            CalendarView()
+        case .newsFeed(let id):
+            NewsListView(category: app.store.newsFeeds.first { $0.id == id }?.category ?? .flash, sourceID: id)
+        }
     }
 }
 
-// MARK: - 自绘侧边栏（弃 List(.sidebar) 系统渲染）
+// MARK: - 顶部 tab 栏（Robinhood 底部 tab 的桌面化：顶部分段 tab）
 
-struct SidebarView: View {
+struct TopTabBar: View {
     @EnvironmentObject var app: AppState
-    let width: CGFloat
-    var onWidthChange: (CGFloat) -> Void = { _ in }
-    var onDrag: (Bool) -> Void = { _ in }
-
-    /// 展开中的资讯分类（nil = 全收）
+    /// 展开中的资讯分类（nil = 收起来源子菜单）
     @State private var expandedCategory: NewsFeedCategory?
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 2) {
-                    // 导航区
-                    SidebarItemRow(icon: .star, title: L10n.l("sidebar.watchlist"),
-                                   isSelected: app.selectedTab == .watchlist, isExpanded: nil) {
-                        select(.watchlist)
-                    }
-                    SidebarItemRow(icon: .chartLine, title: L10n.l("sidebar.markets"),
-                                   isSelected: app.selectedTab == .markets, isExpanded: nil) {
-                        select(.markets)
-                    }
-
-                    // 资讯区（四分类，可展开）
-                    ForEach(NewsFeedCategory.allCases) { category in
-                        let expanded = expandedCategory == category
-                        SidebarItemRow(icon: categoryIcon(category),
-                                       title: category.displayName,
-                                       isSelected: isCategoryActive(category),
-                                       isExpanded: expanded) {
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                expandedCategory = expanded ? nil : category
-                                // 展开时默认进入「全部」
-                                if expandedCategory == category {
-                                    select(allItem(for: category))
-                                }
-                            }
-                        }
-                        if expanded {
-                            VStack(spacing: 1) {
-                                // 全部
-                                sourceRow(title: L10n.l("sidebar.all") + category.displayName,
-                                          icon: .layoutGrid,
-                                          selected: app.selectedTab == allItem(for: category)) {
-                                    select(allItem(for: category))
-                                }
-                                ForEach(feeds(for: category)) { feed in
-                                    sourceRow(title: feed.name,
-                                              icon: .point,
-                                              selected: app.selectedTab == .newsFeed(sourceID: feed.id)) {
-                                        select(.newsFeed(sourceID: feed.id))
-                                    }
-                                }
-                            }
-                            .padding(.leading, 14)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                        }
-                    }
-                }
-                .padding(6)
+        HStack(spacing: 4) {
+            // 主 tab
+            tabButton(icon: .star, title: L10n.l("sidebar.watchlist"),
+                      selected: app.selectedTab == .watchlist) {
+                select(.watchlist)
             }
-            .scrollContentBackground(.hidden)
-            .background(DS.bgPanel)
+            tabButton(icon: .chartLine, title: L10n.l("sidebar.markets"),
+                      selected: app.selectedTab == .markets) {
+                select(.markets)
+            }
 
-            // 底部：拖拽手柄区域
-            Rectangle()
-                .fill(Color.clear)
-                .frame(height: 6)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            onDrag(true)
-                            let newWidth = min(max(width + value.translation.width, 170), 320)
-                            onWidthChange(newWidth)
+            // 资讯分类 tab（带来源子菜单）
+            ForEach(NewsFeedCategory.allCases) { category in
+                let expanded = expandedCategory == category
+                Menu {
+                    // 全部
+                    Button {
+                        select(allItem(for: category))
+                    } label: {
+                        Label(L10n.l("sidebar.all") + category.displayName,
+                              systemImage: "square.grid.2x2")
+                    }
+                    if !feeds(for: category).isEmpty {
+                        Divider()
+                        ForEach(feeds(for: category)) { feed in
+                            Button {
+                                select(.newsFeed(sourceID: feed.id))
+                            } label: {
+                                Label(feed.name, systemImage: "dot.radiowaves.left.and.right")
+                            }
                         }
-                        .onEnded { _ in onDrag(false) }
-                )
-                .help("拖拽调整侧边栏宽度")
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        TectonicIconView(icon: categoryIcon(category), size: 14,
+                                         color: isCategoryActive(category) ? DS.textPrimary : DS.textSecondary)
+                        Text(category.displayName)
+                            .font(.system(size: 13, weight: isCategoryActive(category) ? .semibold : .regular))
+                            .foregroundStyle(isCategoryActive(category) ? DS.textPrimary : DS.textSecondary)
+                        TectonicIconView(icon: .chevronDown, size: 10, color: DS.textTertiary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: DS.radiusCard)
+                            .fill(isCategoryActive(category) ? DS.bgSelected : .clear)
+                    )
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+            Spacer()
         }
+        .padding(.horizontal, DS.space4)
+        .padding(.vertical, 6)
+        .background(DS.bgApp)
+    }
+
+    private func tabButton(icon: TectonicIcon, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                TectonicIconView(icon: icon, size: 14, color: selected ? DS.textPrimary : DS.textSecondary)
+                Text(title)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: DS.radiusCard)
+                    .fill(selected ? DS.bgSelected : .clear)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func select(_ item: AppState.SidebarItem) {
         app.selectedTab = item
-        // 切换分类时清空详情选择
         app.selectedSymbol = nil
         app.selectedNews = nil
     }
@@ -206,14 +182,14 @@ struct SidebarView: View {
 
     private func isCategoryActive(_ category: NewsFeedCategory) -> Bool {
         switch category {
-        case .flash: app.selectedTab == .newsFlash || matchesFeed(category, .flash)
-        case .research: app.selectedTab == .newsResearch || matchesFeed(category, .research)
-        case .earnings: app.selectedTab == .newsEarnings || matchesFeed(category, .earnings)
-        case .calendar: app.selectedTab == .newsCalendar || matchesFeed(category, .calendar)
+        case .flash: app.selectedTab == .newsFlash || matchesFeed(.flash)
+        case .research: app.selectedTab == .newsResearch || matchesFeed(.research)
+        case .earnings: app.selectedTab == .newsEarnings || matchesFeed(.earnings)
+        case .calendar: app.selectedTab == .newsCalendar || matchesFeed(.calendar)
         }
     }
 
-    private func matchesFeed(_ category: NewsFeedCategory, _ c: NewsFeedCategory) -> Bool {
+    private func matchesFeed(_ c: NewsFeedCategory) -> Bool {
         guard case .newsFeed(let id) = app.selectedTab else { return false }
         return app.store.newsFeeds.first { $0.id == id }?.category == c
     }
@@ -226,21 +202,54 @@ struct SidebarView: View {
         case .calendar: .calendar
         }
     }
+}
 
-    private func sourceRow(title: String, icon: TectonicIcon, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+// MARK: - 详情页导航容器（返回按钮 + 标题，Robinhood push 风格）
+
+struct DetailNavContainer<Content: View>: View {
+    @EnvironmentObject var app: AppState
+    let title: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 返回栏
             HStack(spacing: 8) {
-                TectonicIconView(icon: icon, size: 14, color: selected ? DS.accent : DS.textTertiary)
+                Button {
+                    app.selectedSymbol = nil
+                    app.selectedNews = nil
+                } label: {
+                    HStack(spacing: 4) {
+                        TectonicIconView(icon: .chevronLeft, size: 14, color: DS.textPrimary)
+                        Text(L10n.l("nav.back"))
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(DS.textPrimary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: DS.radiusMedium)
+                            .fill(DS.bgSurface)
+                    )
+                }
+                .buttonStyle(.plain)
+                .help(L10n.l("nav.back"))
+
                 Text(title)
-                    .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? DS.accent : DS.textSecondary)
+                    .font(.system(size: DS.screenTitleSize, weight: .bold))
+                    .kerning(-0.2)
+                    .foregroundStyle(DS.textPrimary)
                     .lineLimit(1)
-                Spacer(minLength: 0)
+                Spacer()
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .contentShape(Rectangle())
+            .padding(.horizontal, DS.space4)
+            .padding(.vertical, DS.space2)
+            .background(DS.bgApp)
+
+            DSDivider()
+
+            content
         }
-        .buttonStyle(.plain)
+        .background(DS.bgApp)
     }
 }
