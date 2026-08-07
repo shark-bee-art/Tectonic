@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreKit
 
-/// 添加标的：搜索 → 结果列表 → 添加自选（TradingView 淡雅组件）
+/// 添加标的：搜索 → 结果列表 → 添加自选（Robinhood 组件）
 struct AddSymbolButton: View {
     @EnvironmentObject var app: AppState
     @State private var isPresented = false
@@ -23,9 +23,8 @@ struct AddSymbolButton: View {
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             AddSymbolPopover()
                 .environmentObject(app)
-                .frame(width: 440)
+                .frame(width: 460)
         }
-        // 命令面板「添加标的」触发
         .onChange(of: app.openAddSymbol) { _, v in
             if v {
                 isPresented = true
@@ -48,25 +47,23 @@ struct AddSymbolPopover: View {
     @State private var lastAdded: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                TectonicIconView(icon: .plus, size: 16, color: DS.accent)
-                Text(L10n.l("add.title"))
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(DS.textPrimary)
-            }
+        VStack(alignment: .leading, spacing: DS.space4) {
+            // RH Screen Title
+            Text(L10n.l("add.title"))
+                .font(.system(size: DS.screenTitleSize, weight: .bold))
+                .foregroundStyle(DS.textPrimary)
 
             if let msg = addedMessage {
                 HStack(spacing: 6) {
                     TectonicIconView(icon: .circleCheck, size: 14, color: DS.down)
                     Text(msg)
-                        .font(.system(size: DS.captionSize))
+                        .font(.system(size: DS.bodySmallSize))
                         .foregroundStyle(DS.down)
                 }
                 .transition(.opacity)
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: DS.space2) {
                 Picker("市场", selection: $selectedMarket) {
                     Text("全部").tag(Market?.none)
                     ForEach(Market.allCases) { m in
@@ -75,9 +72,9 @@ struct AddSymbolPopover: View {
                 }
                 .pickerStyle(.menu)
                 .frame(width: 110)
-                DSInputField(text: $query, placeholder: L10n.l("add.searchHint"))
+                DSSearchField(text: $query, placeholder: L10n.l("add.searchHint"))
                     .onSubmit { search() }
-                DSButton(L10n.l("add.search"), icon: .search, prominent: true) { search() }
+                DSOutlineButton(title: L10n.l("add.search"), icon: .search) { search() }
                     .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSearching)
             }
 
@@ -86,7 +83,7 @@ struct AddSymbolPopover: View {
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else if results.isEmpty && !query.isEmpty {
                 Text(L10n.l("add.noResult"))
-                    .font(.system(size: DS.captionSize))
+                    .font(.system(size: DS.bodySmallSize))
                     .foregroundStyle(DS.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else if !results.isEmpty {
@@ -100,7 +97,7 @@ struct AddSymbolPopover: View {
                 .frame(minHeight: 90, maxHeight: 260)
             } else {
                 Text(L10n.l("add.hint"))
-                    .font(.system(size: DS.captionSize))
+                    .font(.system(size: DS.bodySmallSize))
                     .foregroundStyle(DS.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
             }
@@ -109,20 +106,22 @@ struct AddSymbolPopover: View {
                 DSInputField(text: $groupName, placeholder: L10n.l("add.groupHint"))
                     .frame(width: 200)
                 Spacer()
-                DSButton(L10n.l("add.done"), icon: .check, prominent: true) { dismiss() }
+                DSTradeButton(title: L10n.l("add.done")) { dismiss() }
+                    .frame(width: 120)
             }
         }
-        .padding(16)
+        .padding(DS.space6)
     }
 
     private func symbolRow(_ symbol: Symbol) -> some View {
-        HStack {
+        HStack(spacing: DS.space3) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(symbol.name)
-                    .font(.system(size: DS.listTitleSize, weight: .medium))
+                    .font(.system(size: DS.positionTitleSize, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
                 Text("\(symbol.market.displayName) \(symbol.code)")
-                    .font(.system(size: DS.metaSize))
+                    .font(.system(size: DS.tickerSize, weight: .medium))
+                    .kerning(0.3)
                     .foregroundStyle(DS.textSecondary)
             }
             Spacer()
@@ -130,16 +129,16 @@ struct AddSymbolPopover: View {
                 HStack(spacing: 4) {
                     TectonicIconView(icon: .circleCheck, size: 14, color: DS.down)
                     Text(L10n.l("add.added"))
-                        .font(.system(size: DS.captionSize, weight: .medium))
+                        .font(.system(size: DS.bodySmallSize, weight: .medium))
                         .foregroundStyle(DS.down)
                 }
             } else {
-                DSButton(L10n.l("add.add"), icon: .plus, prominent: true) {
+                DSOutlineButton(title: L10n.l("add.add"), icon: .plus) {
                     add(symbol)
                 }
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, DS.space3)
         .padding(.vertical, 6)
         .contentShape(Rectangle())
     }
@@ -154,7 +153,6 @@ struct AddSymbolPopover: View {
         Task {
             defer { isSearching = false }
             results = await app.store.search(query: q, market: selectedMarket)
-            // 兜底：直接按代码构造（精确匹配）
             if results.isEmpty, let symbol = exactSymbol(q) {
                 results = [symbol]
             }
@@ -163,20 +161,16 @@ struct AddSymbolPopover: View {
 
     private func exactSymbol(_ q: String) -> Symbol? {
         let up = q.uppercased()
-        // A股 6 位数字
         if up.allSatisfy(\.isNumber), up.count == 6 {
             return Symbol(market: .cn, code: up, name: up)
         }
-        // 港股 5 位数字或 .HK 后缀
         if up.hasSuffix(".HK") || (up.allSatisfy(\.isNumber) && up.count == 5) {
             let code = up.replacingOccurrences(of: ".HK", with: "")
             return Symbol(market: .hk, code: code, name: code)
         }
-        // 加密 USDT 交易对
         if up.hasSuffix("USDT") || up.hasSuffix("USDC") {
             return Symbol(market: .crypto, code: up, name: up)
         }
-        // 基金 6 位数字（00/01 开头）
         if up.allSatisfy(\.isNumber), up.count == 6, up.hasPrefix("0") || up.hasPrefix("1") {
             return Symbol(market: .fund, code: up, name: up)
         }
@@ -198,7 +192,6 @@ struct AddSymbolPopover: View {
                     addedMessage = "\(symbol.name) 已在自选中"
                 }
             }
-            // 消息 2.5 秒后消失
             Task {
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 withAnimation { addedMessage = nil }

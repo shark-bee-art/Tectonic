@@ -2,8 +2,7 @@ import SwiftUI
 import CoreKit
 
 /// 资讯分类列表：快讯/研报/财报/日历 通用；日历按日期分组
-/// sourceID 非 nil 时只显示该订阅源（侧边栏子菜单独立查看）
-/// TradingView 淡雅强化：时间列居左 + 来源标签居右 + hover 箭头/背景反馈
+/// Robinhood News Card：12pt 圆角卡片 + 标题 + 来源/时间 + hover 反馈
 struct NewsListView: View {
     @EnvironmentObject var app: AppState
     let category: NewsFeedCategory
@@ -14,13 +13,11 @@ struct NewsListView: View {
     @State private var lastError: String?
     @State private var refreshTick = 0
 
-    /// 当前源（sourceID 非 nil 时）
     private var sourceFeed: NewsFeed? {
         guard let sourceID else { return nil }
         return app.store.newsFeeds.first { $0.id == sourceID }
     }
 
-    /// 标题：单源显示源名，否则显示分类名
     private var titleText: String {
         sourceFeed?.name ?? category.displayName
     }
@@ -49,36 +46,13 @@ struct NewsListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部工具条
-            HStack(spacing: 8) {
-                TectonicIconView(icon: categoryIcon, size: 16, color: DS.textPrimary)
-                Text(titleText)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(DS.textPrimary)
-                    .lineLimit(1)
-                Spacer()
-                if let last = items.first?.publishedAt {
-                    Text("更新于 \(last.formatted(.relative(presentation: .named)))")
-                        .font(.system(size: DS.metaSize))
-                        .foregroundStyle(DS.textTertiary)
-                }
-                DSIconButton(icon: .refresh, help: L10n.l("common.refresh")) {
-                    refreshTick += 1
-                }
-                .disabled(isLoading)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            DSDivider()
-
             if category == .calendar || category == .earnings {
                 groupedList
             } else {
                 plainList
             }
         }
-        .background(DS.bgPanel)
+        .background(DS.bgApp)
         .task(id: "\(category.rawValue)-\(sourceID ?? "")-\(refreshTick)") {
             await load()
         }
@@ -95,31 +69,31 @@ struct NewsListView: View {
 
     private var groupedList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: DS.space8) {
                 ForEach(grouped, id: \.0) { day, dayItems in
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 6) {
                             if Calendar.current.isDateInToday(day) {
-                                DSChip(text: L10n.l("news.today"), color: DS.accent)
+                                DSChip(text: L10n.l("news.today"), color: DS.up)
                             }
                             Text(dayHeader(day))
-                                .font(.system(size: DS.listTitleSize, weight: .semibold))
+                                .font(.system(size: DS.sectionHeaderSize, weight: .semibold))
                                 .foregroundStyle(DS.textPrimary)
                             Spacer()
                             Text("\(dayItems.count) 项")
-                                .font(.system(size: DS.metaSize))
+                                .font(.system(size: DS.bodySmallSize))
                                 .foregroundStyle(DS.textTertiary)
                         }
-                        .padding(.horizontal, 10)
+                        .padding(.horizontal, DS.space4)
 
                         ForEach(dayItems) { item in
-                            NewsRow(item: item)
+                            NewsCard(item: item)
                                 .onTapGesture { app.selectedNews = item }
                         }
                     }
                 }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, DS.space4)
         }
         .overlay { overlayState }
     }
@@ -128,13 +102,14 @@ struct NewsListView: View {
 
     private var plainList: some View {
         ScrollView {
-            LazyVStack(spacing: 2) {
+            LazyVStack(spacing: DS.space2) {
                 ForEach(filteredItems) { item in
-                    NewsRow(item: item)
+                    NewsCard(item: item)
                         .onTapGesture { app.selectedNews = item }
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.horizontal, DS.space4)
+            .padding(.vertical, DS.space4)
         }
         .overlay { overlayState }
     }
@@ -149,7 +124,6 @@ struct NewsListView: View {
                           actionTitle: L10n.l("common.refresh"),
                           action: { refreshTick += 1 })
         } else if filteredItems.isEmpty && !items.isEmpty {
-            // 有数据但搜索无结果
             DSPlaceholder(icon: .searchOff,
                           title: L10n.l("news.searchEmpty"),
                           subtitle: "\"\(app.searchText)\"")
@@ -157,15 +131,6 @@ struct NewsListView: View {
             DSPlaceholder(icon: .news,
                           title: L10n.l("news.empty"),
                           subtitle: L10n.l("news.emptyHint"))
-        }
-    }
-
-    private var categoryIcon: TectonicIcon {
-        switch category {
-        case .flash: .bolt
-        case .research: .fileText
-        case .earnings: .chartBar
-        case .calendar: .calendar
         }
     }
 
@@ -182,7 +147,6 @@ struct NewsListView: View {
         defer { isLoading = false }
         items = await app.store.fetchNews(category: category, sourceID: sourceID)
         lastError = nil
-        // 订阅源未导入时先导入再拉一次
         if items.isEmpty, app.store.newsFeeds.isEmpty {
             try? app.store.importBuiltinFeedsIfNeeded()
             items = await app.store.fetchNews(category: category, sourceID: sourceID)
@@ -190,61 +154,71 @@ struct NewsListView: View {
     }
 }
 
-// MARK: - 新闻行（TradingView 新闻流：时间列左 + 来源右 + hover 箭头）
+// MARK: - 新闻卡片（RH News Card：12pt 圆角 + 1pt 边框 + 标题/来源/时间）
 
-struct NewsRow: View {
+struct NewsCard: View {
     let item: NewsItem
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            // hover 箭头（非 hover 占位保持列对齐）
-            TectonicIconView(icon: .chevronRight, size: 9, color: DS.accent)
-                .opacity(hovering ? 1 : 0)
-                .frame(width: 10)
+        HStack(alignment: .top, spacing: DS.space3) {
+            // 左侧：分类图标方块（RH thumbnail 位）
+            RoundedRectangle(cornerRadius: DS.radiusMedium)
+                .fill(DS.bgSurface)
+                .frame(width: 48, height: 48)
+                .overlay(
+                    TectonicIconView(icon: .news, size: 18, color: DS.textSecondary)
+                )
 
-            // 时间列（固定宽）
-            Text(item.publishedAt.formatted(.relative(presentation: .named)))
-                .font(.system(size: DS.metaSize, weight: .medium))
-                .foregroundStyle(hovering ? DS.accent : DS.textTertiary)
-                .frame(width: 62, alignment: .leading)
-
-            // 标题 + 摘要
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(item.title)
-                        .font(.system(size: DS.listTitleSize, weight: .medium))
-                        .foregroundStyle(DS.textPrimary)
+            // 中间：标题 + 摘要
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                    .lineLimit(2)
+                if !item.summary.isEmpty {
+                    Text(item.summary)
+                        .font(.system(size: DS.bodySmallSize))
+                        .foregroundStyle(DS.textSecondary)
                         .lineLimit(2)
+                }
+                // 元信息：AI 标签 + 来源 + 时间
+                HStack(spacing: 8) {
                     if let tag = item.aiTag {
                         impactChip(tag)
                     }
-                }
-                if !item.summary.isEmpty {
-                    Text(item.summary)
-                        .font(.system(size: DS.listBodySize))
-                        .foregroundStyle(DS.textSecondary)
+                    Text(item.source)
+                        .font(.system(size: DS.tickerSize, weight: .medium))
+                        .foregroundStyle(DS.textTertiary)
                         .lineLimit(1)
+                    Spacer()
+                    Text(item.publishedAt.formatted(.relative(presentation: .named)))
+                        .font(.system(size: DS.tickerSize, weight: .medium))
+                        .foregroundStyle(DS.textTertiary)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
 
-            // 来源标签（右对齐）
-            Text(item.source)
-                .font(.system(size: DS.metaSize, weight: .medium))
-                .foregroundStyle(DS.textSecondary)
-                .lineLimit(1)
-                .frame(maxWidth: 120, alignment: .trailing)
+            // 右侧 hover 箭头
+            TectonicIconView(icon: .chevronRight, size: 12, color: DS.textTertiary)
+                .opacity(hovering ? 1 : 0)
+                .padding(.top, 4)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .contentShape(Rectangle())
+        .padding(DS.space3)
         .background(
-            RoundedRectangle(cornerRadius: DS.radiusMedium)
-                .fill(hovering ? DS.bgHover : .clear)
+            RoundedRectangle(cornerRadius: DS.radiusCard)
+                .fill(isSelected ? DS.bgSelected : (hovering ? DS.bgHover : DS.bgPanel))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.radiusCard)
+                        .stroke(DS.border, lineWidth: 1)
+                )
         )
         .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+
+    private var isSelected: Bool {
+        // 由外部选中态驱动——简化：hover 表达即可
+        false
     }
 
     @ViewBuilder
@@ -268,15 +242,15 @@ struct NewsDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: DS.space4) {
                 // 元信息行
                 HStack(spacing: 10) {
                     TectonicIconView(icon: .news, size: 13, color: DS.textTertiary)
                     Text(item.source)
-                        .font(.system(size: DS.captionSize))
+                        .font(.system(size: DS.bodySmallSize))
                         .foregroundStyle(DS.textSecondary)
                     Text(item.publishedAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: DS.captionSize))
+                        .font(.system(size: DS.bodySmallSize))
                         .foregroundStyle(DS.textTertiary)
                     Spacer()
                     if let tag = item.aiTag {
@@ -296,9 +270,10 @@ struct NewsDetailView: View {
                     }
                 }
 
-                // 标题
+                // 标题（RH Screen Title）
                 Text(item.title)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: DS.screenTitleSize, weight: .bold))
+                    .kerning(-0.2)
                     .foregroundStyle(DS.textPrimary)
                     .textSelection(.enabled)
 
@@ -306,13 +281,13 @@ struct NewsDetailView: View {
 
                 // 正文
                 Text(item.content ?? item.summary)
-                    .font(.system(size: 14))
+                    .font(.system(size: DS.bodySize))
                     .foregroundStyle(DS.textPrimary)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .lineSpacing(4)
+                    .lineSpacing(5)
             }
-            .padding(20)
+            .padding(DS.space6)
             .frame(maxWidth: 860, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
@@ -323,7 +298,7 @@ struct NewsDetailView: View {
                     openChat()
                 } label: {
                     HStack(spacing: 4) {
-                        TectonicIconView(icon: .sparkles, size: 14, color: DS.accent)
+                        TectonicIconView(icon: .sparkles, size: 14, color: DS.up)
                         Text(L10n.l("news.aiChat"))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(DS.textPrimary)

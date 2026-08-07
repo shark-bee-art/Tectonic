@@ -1,34 +1,56 @@
 import SwiftUI
 import CoreKit
 
-// MARK: - 自绘顶部栏（TradingView 淡雅：品牌区 / 内容列搜索 / 详情列操作按钮）
+// MARK: - 顶部栏（Robinhood Nav Bar：大标题 22pt 左对齐 + 搜索框 + 操作按钮）
 
 struct TopBar: View {
     @EnvironmentObject var app: AppState
     var sidebarWidth: CGFloat
 
+    /// 当前内容列标题（RH 大标题）
+    private var screenTitle: String {
+        switch app.selectedTab {
+        case .watchlist: L10n.l("sidebar.watchlist")
+        case .markets: L10n.l("sidebar.markets")
+        case .newsFlash: L10n.l("sidebar.flash")
+        case .newsResearch: L10n.l("sidebar.research")
+        case .newsEarnings: L10n.l("sidebar.earnings")
+        case .newsCalendar: L10n.l("sidebar.calendar")
+        case .newsFeed(let id):
+            app.store.newsFeeds.first { $0.id == id }?.name ?? L10n.l("sidebar.news")
+        }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            // 1. 侧边栏顶部：品牌区（宽度与侧边栏一致，保证搜索框对齐内容列）
+            // 1. 侧边栏顶部：品牌区
             brandArea
                 .frame(width: sidebarWidth)
-                .frame(height: 44)
+                .frame(height: 52)
                 .background(DS.bgPanel)
 
             DSDivider()
 
-            // 2. 内容列顶部：搜索框（居中于内容列）
-            searchArea
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(DS.bgApp)
+            // 2. 内容列顶部：大标题（RH Screen Title 22pt 左对齐）+ 搜索框
+            VStack(alignment: .leading, spacing: 6) {
+                Text(screenTitle)
+                    .font(.system(size: DS.screenTitleSize, weight: .bold))
+                    .kerning(-0.2)
+                    .foregroundStyle(DS.textPrimary)
+                DSSearchField(text: $app.searchText,
+                              placeholder: L10n.l("sidebar.search"))
+            }
+            .padding(.horizontal, DS.space4)
+            .padding(.vertical, DS.space2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.bgApp)
 
             DSDivider()
 
-            // 3. 详情列顶部：操作按钮（统一右侧）
+            // 3. 详情列顶部：操作按钮（右侧）
             actionArea
                 .frame(width: 240)
-                .frame(height: 44)
+                .frame(height: 52)
                 .background(DS.bgApp)
         }
     }
@@ -39,34 +61,19 @@ struct TopBar: View {
         HStack(spacing: 8) {
             // hiddenTitleBar 下为红绿灯留安全区
             Spacer().frame(width: 70)
-            // 品牌标识：accent 圆角方块 + 白色趋势线
-            RoundedRectangle(cornerRadius: 6)
-                .fill(LinearGradient(colors: [DS.accent, DS.accent.opacity(0.75)],
-                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                .frame(width: 22, height: 22)
+            // 品牌标识：黑色圆角方块 + 白色趋势线（RH 简洁风）
+            RoundedRectangle(cornerRadius: DS.radiusMedium)
+                .fill(DS.tradeButton)
+                .frame(width: 24, height: 24)
                 .overlay(
                     TectonicIconView(icon: .chartLine, size: 13, color: .white)
                 )
             Text("Tectonic")
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(DS.textPrimary)
             Spacer(minLength: 0)
         }
         .padding(.trailing, 12)
-    }
-
-    // MARK: 搜索区
-
-    private var searchArea: some View {
-        HStack(spacing: 8) {
-            Spacer()
-            DSInputField(text: $app.searchText,
-                         placeholder: L10n.l("sidebar.search"),
-                         icon: .search)
-                .frame(width: 280)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
     }
 
     // MARK: 操作按钮区
@@ -76,7 +83,7 @@ struct TopBar: View {
             Spacer(minLength: 0)
             // 刷新
             if app.isRefreshing {
-                TectonicIconView(icon: .refresh, size: 16, color: DS.accent)
+                TectonicIconView(icon: .refresh, size: 16, color: DS.textSecondary)
                     .rotationEffect(.degrees(app.isRefreshing ? 360 : 0))
                     .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: app.isRefreshing)
                     .padding(6)
@@ -88,7 +95,7 @@ struct TopBar: View {
             }
             // 添加标的
             AddSymbolButton()
-            // AI 问询（当前上下文存在时可用）
+            // AI 问询
             if app.chatPanel == nil {
                 DSIconButton(icon: .sparkles, help: L10n.l("chat.open")) {
                     openAI()
@@ -99,7 +106,6 @@ struct TopBar: View {
     }
 
     private func openAI() {
-        // 无当前详情上下文时打开通用问询
         app.chatPanel = ChatPanelContext(
             title: "Tectonic AI",
             subtitle: L10n.l("placeholder.detail"),

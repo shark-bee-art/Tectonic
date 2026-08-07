@@ -62,11 +62,11 @@ struct CalendarView: View {
                     DSChip(text: L10n.l("news.today"), color: DS.accent)
                 }
                 Text(dayTitle(day))
-                    .font(.system(size: DS.listTitleSize, weight: .semibold))
+                    .font(.system(size: DS.sectionHeaderSize, weight: .semibold))
                     .foregroundStyle(DS.textPrimary)
                 Spacer()
                 Text("\(events.count) 项")
-                    .font(.system(size: DS.metaSize))
+                    .font(.system(size: DS.tickerSize))
                     .foregroundStyle(DS.textTertiary)
             }
             .padding(.bottom, 2)

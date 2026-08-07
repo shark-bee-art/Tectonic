@@ -50,12 +50,12 @@ public enum TectonicThemeCatalog {
     public static let themes: [TectonicTheme] = [
         // ══════════ 浅色（12）══════════
 
-        // 1. TradingView 淡雅（默认）：白/近白 + 冷灰层级 + 品牌蓝 —— v2 重设计默认
+        // 1. Robinhood 淡雅（默认）：纯白画布 + 纯黑文字 + 品牌绿/橙红涨跌 —— v3 重写默认
         TectonicTheme(
             id: "alabaster", isDark: false,
-            background: "#FFFFFF", sidebar: "#F8F9FA", text: "#131722",
-            secondary: "#787B86", tertiary: "#B2B5BE", accent: "#2962FF",
-            time: "#787B86", hover: "#F0F3FA", selection: "#E8F0FE", border: "#E0E3EB"
+            background: "#FFFFFF", sidebar: "#FFFFFF", text: "#000000",
+            secondary: "#5C6166", tertiary: "#9B9EA3", accent: "#000000",
+            time: "#5C6166", hover: "#F7F7F7", selection: "#EFEFEF", border: "#E6E6E6"
         ),
         // 2. 纸张：奶油纸 + 深棕墨 + 焦糖 —— typewriter
         TectonicTheme(

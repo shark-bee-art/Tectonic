@@ -1,8 +1,8 @@
 import SwiftUI
 import CoreKit
 
-/// 标的详情：行情 Hero + 技术面卡片 + 基本面卡片 + AI 问询（右侧面板）
-/// TradingView 淡雅：数据卡片化、等宽数字、红涨绿跌
+/// 标的详情：Robinhood 风格——Hero 大数字 + 技术面/基本面卡片 + AI 问询
+/// 涨跌绑定方向色（中国习惯：涨=橙红、跌=品牌绿），全等宽数字
 struct QuoteDetailView: View {
     @EnvironmentObject var app: AppState
     let symbol: Symbol
@@ -17,12 +17,12 @@ struct QuoteDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: DS.space8) {
                 header
                 technicalSection
                 fundamentalSection
             }
-            .padding(16)
+            .padding(DS.space6)
             .frame(maxWidth: 860, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
@@ -33,7 +33,7 @@ struct QuoteDetailView: View {
                     openChat()
                 } label: {
                     HStack(spacing: 4) {
-                        TectonicIconView(icon: .sparkles, size: 14, color: DS.accent)
+                        TectonicIconView(icon: .sparkles, size: 14, color: DS.up)
                         Text(L10n.l("detail.aiChat"))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(DS.textPrimary)
@@ -94,148 +94,156 @@ struct QuoteDetailView: View {
         )
     }
 
-    // MARK: 行情 Hero
+    // MARK: 行情 Hero（RH Portfolio Hero 结构：标签 + 40pt 大数字 + 涨跌）
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
+        VStack(alignment: .leading, spacing: 4) {
+            // All-Caps 标签
+            DSCapsLabel(text: "\(symbol.code) · \(symbol.market.displayName)")
+
             if let quote {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
-                        Text(fmt(quote.price))
-                            .font(.system(size: 40, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(DS.directionColor(quote.change))
-                        Text("\(fmtSigned(quote.change)) (\(fmtPercent(quote.changePercent)))")
-                            .font(.system(size: 16, weight: .medium).monospacedDigit())
-                            .foregroundStyle(DS.directionColor(quote.change))
-                    }
-                    Text("今开 \(fmt(quote.open))  最高 \(fmt(quote.high))  最低 \(fmt(quote.low))  昨收 \(fmt(quote.prevClose))")
-                        .font(.system(size: DS.captionSize))
-                        .foregroundStyle(DS.textSecondary)
+                HStack(alignment: .firstTextBaseline, spacing: DS.space3) {
+                    // 40pt Hero 大数字
+                    Text(fmt(quote.price))
+                        .font(.system(size: DS.heroSize, weight: .bold).monospacedDigit())
+                        .kerning(-0.5)
+                        .foregroundStyle(DS.directionColor(quote.change))
+                    // 涨跌（Day Change，无底色纯文字）
+                    Text("\(fmtSigned(quote.change)) (\(fmtPercent(quote.changePercent)))")
+                        .font(.system(size: 16, weight: .medium).monospacedDigit())
+                        .foregroundStyle(DS.directionColor(quote.change))
                 }
+                Text("今开 \(fmt(quote.open))  最高 \(fmt(quote.high))  最低 \(fmt(quote.low))  昨收 \(fmt(quote.prevClose))")
+                    .font(.system(size: DS.tickerSize, weight: .medium))
+                    .foregroundStyle(DS.textSecondary)
+                    .padding(.top, 2)
             } else {
                 ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 80)
             }
-            Spacer()
-            WatchlistToggle(symbol: symbol)
-            Text(symbol.currency)
-                .font(.system(size: DS.captionSize))
-                .foregroundStyle(DS.textSecondary)
+
+            HStack(spacing: DS.space3) {
+                WatchlistToggle(symbol: symbol)
+                Text(symbol.currency)
+                    .font(.system(size: DS.bodySmallSize))
+                    .foregroundStyle(DS.textTertiary)
+            }
+            .padding(.top, DS.space2)
         }
+        .padding(.bottom, DS.space2)
     }
 
     // MARK: 基本面数据（SEC EDGAR，仅美股）
 
     private var fundamentalSection: some View {
-        DSCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    TectonicIconView(icon: .chartBar, size: 15, color: DS.textPrimary)
-                    Text(L10n.l("detail.fundamental"))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DS.textPrimary)
-                    Spacer()
-                    if let fd = fundamental, let year = fd.revenueYear {
-                        Text(L10n.l("detail.fundFiscalYear") + " " + year)
-                            .font(.system(size: DS.metaSize))
-                            .foregroundStyle(DS.textTertiary)
-                    }
-                }
-
-                if isLoadingFund {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                } else if let fundError {
-                    Text(fundError)
-                        .font(.system(size: DS.captionSize))
-                        .foregroundStyle(DS.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                } else if let fd = fundamental {
-                    VStack(alignment: .leading, spacing: 14) {
-                        // 盈利能力
-                        VStack(alignment: .leading, spacing: 8) {
-                            sectionLabel(L10n.l("detail.fundProfitability"))
-                            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
-                                GridRow {
-                                    fundItem(L10n.l("detail.fundRevenue"), value: fd.revenue.map { fmtAmount($0) })
-                                    fundItem(L10n.l("detail.fundNetIncome"), value: fd.netIncome.map { fmtAmount($0) })
-                                    fundItem(L10n.l("detail.fundOperatingIncome"), value: fd.operatingIncome.map { fmtAmount($0) })
-                                    fundItem(L10n.l("detail.fundGrossProfit"), value: fd.grossProfit.map { fmtAmount($0) })
-                                }
-                            }
-                        }
-
-                        DSDivider()
-
-                        // 每股与估值
-                        VStack(alignment: .leading, spacing: 8) {
-                            sectionLabel(L10n.l("detail.fundValuation"))
-                            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
-                                GridRow {
-                                    fundItem(L10n.l("detail.fundEPS"), value: fd.eps.map { String(format: "%.2f", $0) })
-                                    fundItem("ROE", value: fd.roe.map { String(format: "%.1f%%", $0) })
-                                    fundItem("PE", value: quote.flatMap { fd.pe(price: $0.price) }.map { String(format: "%.1f", $0) })
-                                    fundItem("PB", value: quote.flatMap { fd.pb(price: $0.price) }.map { String(format: "%.1f", $0) })
-                                }
-                            }
-                        }
-
-                        DSDivider()
-
-                        // 资产负债
-                        VStack(alignment: .leading, spacing: 8) {
-                            sectionLabel(L10n.l("detail.fundBalance"))
-                            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
-                                GridRow {
-                                    fundItem(L10n.l("detail.fundAssets"), value: fd.assets.map { fmtAmount($0) })
-                                    fundItem(L10n.l("detail.fundLiabilities"), value: fd.liabilities.map { fmtAmount($0) })
-                                    fundItem(L10n.l("detail.fundEquity"), value: fd.equity.map { fmtAmount($0) })
-                                    fundItem(L10n.l("detail.fundDebtRatio"), value: fd.debtRatio.map { String(format: "%.1f%%", $0) })
-                                }
-                                GridRow {
-                                    fundItem(L10n.l("detail.fundShares"), value: fd.sharesOutstanding.map { fmtAmount($0) })
-                                }
-                            }
-                        }
-
-                        HStack(spacing: 4) {
-                            Text("SEC EDGAR")
-                                .font(.system(size: 10))
-                                .foregroundStyle(DS.textTertiary)
-                            if let fd = fundamental, let bd = fd.balanceDate {
-                                Text("· " + L10n.l("detail.fundBalanceDate") + " " + bd)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(DS.textTertiary)
-                            }
-                        }
-                    }
-                } else {
-                    Text(L10n.l("detail.fundUnsupported"))
-                        .font(.system(size: DS.captionSize))
+        VStack(alignment: .leading, spacing: DS.space3) {
+            HStack {
+                TectonicIconView(icon: .chartBar, size: 15, color: DS.textPrimary)
+                Text(L10n.l("detail.fundamental"))
+                    .font(.system(size: DS.sectionHeaderSize, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                Spacer()
+                if let fd = fundamental, let year = fd.revenueYear {
+                    Text(L10n.l("detail.fundFiscalYear") + " " + year)
+                        .font(.system(size: DS.bodySmallSize))
                         .foregroundStyle(DS.textTertiary)
-                        .frame(maxWidth: .infinity, minHeight: 120)
                 }
             }
-        }
-    }
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: DS.metaSize, weight: .medium))
-            .foregroundStyle(DS.textSecondary)
+            if isLoadingFund {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else if let fundError {
+                Text(fundError)
+                    .font(.system(size: DS.bodySmallSize))
+                    .foregroundStyle(DS.textSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            } else if let fd = fundamental {
+                VStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        DSCapsLabel(text: L10n.l("detail.fundProfitability"))
+                        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+                            GridRow {
+                                fundItem(L10n.l("detail.fundRevenue"), value: fd.revenue.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundNetIncome"), value: fd.netIncome.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundOperatingIncome"), value: fd.operatingIncome.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundGrossProfit"), value: fd.grossProfit.map { fmtAmount($0) })
+                            }
+                        }
+                    }
+
+                    DSDivider()
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        DSCapsLabel(text: L10n.l("detail.fundValuation"))
+                        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+                            GridRow {
+                                fundItem(L10n.l("detail.fundEPS"), value: fd.eps.map { String(format: "%.2f", $0) })
+                                fundItem("ROE", value: fd.roe.map { String(format: "%.1f%%", $0) })
+                                fundItem("PE", value: quote.flatMap { fd.pe(price: $0.price) }.map { String(format: "%.1f", $0) })
+                                fundItem("PB", value: quote.flatMap { fd.pb(price: $0.price) }.map { String(format: "%.1f", $0) })
+                            }
+                        }
+                    }
+
+                    DSDivider()
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        DSCapsLabel(text: L10n.l("detail.fundBalance"))
+                        Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 8) {
+                            GridRow {
+                                fundItem(L10n.l("detail.fundAssets"), value: fd.assets.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundLiabilities"), value: fd.liabilities.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundEquity"), value: fd.equity.map { fmtAmount($0) })
+                                fundItem(L10n.l("detail.fundDebtRatio"), value: fd.debtRatio.map { String(format: "%.1f%%", $0) })
+                            }
+                            GridRow {
+                                fundItem(L10n.l("detail.fundShares"), value: fd.sharesOutstanding.map { fmtAmount($0) })
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 4) {
+                        Text("SEC EDGAR")
+                            .font(.system(size: 10))
+                            .foregroundStyle(DS.textMuted)
+                        if let fd = fundamental, let bd = fd.balanceDate {
+                            Text("· " + L10n.l("detail.fundBalanceDate") + " " + bd)
+                                .font(.system(size: 10))
+                                .foregroundStyle(DS.textMuted)
+                        }
+                    }
+                }
+            } else {
+                Text(L10n.l("detail.fundUnsupported"))
+                    .font(.system(size: DS.bodySmallSize))
+                    .foregroundStyle(DS.textTertiary)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            }
+        }
+        .padding(DS.space4)
+        .background(
+            RoundedRectangle(cornerRadius: DS.radiusCard)
+                .fill(DS.bgPanel)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.radiusCard)
+                        .stroke(DS.border, lineWidth: 1)
+                )
+        )
     }
 
     private func fundItem(_ title: String, value: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: DS.metaSize))
+                .font(.system(size: DS.bodySmallSize))
                 .foregroundStyle(DS.textSecondary)
             if let value {
                 Text(value)
-                    .font(.system(size: 13, weight: .medium).monospacedDigit())
+                    .font(.system(size: DS.positionValueSize, weight: .medium).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
             } else {
                 Text("—")
-                    .font(.system(size: 13).monospacedDigit())
+                    .font(.system(size: DS.positionValueSize).monospacedDigit())
                     .foregroundStyle(DS.textTertiary)
             }
         }
@@ -267,150 +275,157 @@ struct QuoteDetailView: View {
     // MARK: 技术面数据
 
     private var technicalSection: some View {
-        DSCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    TectonicIconView(icon: .chartLine, size: 15, color: DS.textPrimary)
-                    Text(L10n.l("detail.technical"))
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(DS.textPrimary)
-                    Spacer()
-                    if let t = technical {
-                        Text(t.period)
-                            .font(.system(size: DS.metaSize))
-                            .foregroundStyle(DS.textTertiary)
-                    }
+        VStack(alignment: .leading, spacing: DS.space3) {
+            HStack {
+                TectonicIconView(icon: .chartLine, size: 15, color: DS.textPrimary)
+                Text(L10n.l("detail.technical"))
+                    .font(.system(size: DS.sectionHeaderSize, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                Spacer()
+                if let t = technical {
+                    Text(t.period)
+                        .font(.system(size: DS.bodySmallSize))
+                        .foregroundStyle(DS.textTertiary)
                 }
+            }
 
-                if isLoadingTech {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 180)
-                } else if let techError {
-                    Text(techError)
-                        .font(.system(size: DS.captionSize))
-                        .foregroundStyle(DS.textSecondary)
-                        .frame(maxWidth: .infinity, minHeight: 180)
-                } else if let t = technical {
-                    VStack(alignment: .leading, spacing: 14) {
-                        // 关键价位
-                        HStack(spacing: 12) {
-                            levelCard(title: L10n.l("detail.support"), value: t.support, current: t.currentPrice, isBelow: true)
-                            levelCard(title: L10n.l("detail.resistance"), value: t.resistance, current: t.currentPrice, isBelow: false)
-                            levelCard(title: L10n.l("detail.low52w"), value: t.low52w, current: t.currentPrice, isBelow: true)
-                            levelCard(title: L10n.l("detail.high52w"), value: t.high52w, current: t.currentPrice, isBelow: false)
+            if isLoadingTech {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            } else if let techError {
+                Text(techError)
+                    .font(.system(size: DS.bodySmallSize))
+                    .foregroundStyle(DS.textSecondary)
+                    .frame(maxWidth: .infinity, minHeight: 180)
+            } else if let t = technical {
+                VStack(alignment: .leading, spacing: 14) {
+                    // 关键价位
+                    HStack(spacing: DS.space3) {
+                        levelCard(title: L10n.l("detail.support"), value: t.support, current: t.currentPrice, isBelow: true)
+                        levelCard(title: L10n.l("detail.resistance"), value: t.resistance, current: t.currentPrice, isBelow: false)
+                        levelCard(title: L10n.l("detail.low52w"), value: t.low52w, current: t.currentPrice, isBelow: true)
+                        levelCard(title: L10n.l("detail.high52w"), value: t.high52w, current: t.currentPrice, isBelow: false)
+                    }
+
+                    DSDivider()
+
+                    // 均线
+                    VStack(alignment: .leading, spacing: 8) {
+                        DSCapsLabel(text: L10n.l("detail.movingAverages"))
+                        Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
+                            maRow("MA20", value: t.sma20, current: t.currentPrice)
+                            maRow("MA50", value: t.sma50, current: t.currentPrice)
+                            maRow("MA200", value: t.sma200, current: t.currentPrice)
                         }
+                    }
 
-                        DSDivider()
+                    DSDivider()
 
-                        // 均线
-                        VStack(alignment: .leading, spacing: 8) {
-                            sectionLabel(L10n.l("detail.movingAverages"))
-                            Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
-                                maRow("MA20", value: t.sma20, current: t.currentPrice)
-                                maRow("MA50", value: t.sma50, current: t.currentPrice)
-                                maRow("MA200", value: t.sma200, current: t.currentPrice)
+                    // 动量与量能
+                    HStack(spacing: DS.space6) {
+                        metricItem(L10n.l("detail.ytd"), value: t.ytdChangePercent.map { fmtPercent($0) } ?? "—",
+                                   color: (t.ytdChangePercent ?? 0) >= 0 ? DS.up : DS.down)
+                        if let pos = t.rangePosition52w {
+                            metricItem(L10n.l("detail.range52w"), value: String(format: "%.0f%%", pos), color: nil)
+                        }
+                        if t.avgVolume20 > 0 {
+                            metricItem(L10n.l("detail.avgVolume20"), value: "\(shortNum(t.avgVolume20))", color: nil)
+                        }
+                        Spacer()
+                    }
+
+                    DSDivider()
+
+                    // 动量指标（RSI/MACD/KDJ/BOLL）
+                    VStack(alignment: .leading, spacing: 8) {
+                        DSCapsLabel(text: L10n.l("detail.momentum"))
+                        Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
+                            if let rsi = t.rsi14 {
+                                GridRow {
+                                    Text("RSI(14)").font(.system(size: DS.bodySmallSize)).foregroundStyle(DS.textSecondary)
+                                    Text(String(format: "%.1f", rsi)).font(.system(size: DS.bodySmallSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
+                                    Text(rsi >= 70 ? L10n.l("detail.overbought") : (rsi <= 30 ? L10n.l("detail.oversold") : L10n.l("detail.neutral")))
+                                        .font(.system(size: DS.tickerSize))
+                                        .foregroundStyle(rsi >= 70 ? DS.up : (rsi <= 30 ? DS.down : DS.textSecondary))
+                                }
+                            }
+                            if let dif = t.macdDIF, let dea = t.macdDEA, let hist = t.macdHistogram {
+                                GridRow {
+                                    Text("MACD").font(.system(size: DS.bodySmallSize)).foregroundStyle(DS.textSecondary)
+                                    Text("DIF \(fmt(dif))  DEA \(fmt(dea))  柱 \(fmt(hist))")
+                                        .font(.system(size: DS.bodySmallSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
+                                    Text(dif >= dea ? L10n.l("detail.bullish") : L10n.l("detail.bearish"))
+                                        .font(.system(size: DS.tickerSize))
+                                        .foregroundStyle(dif >= dea ? DS.up : DS.down)
+                                }
+                            }
+                            if let bu = t.bollUpper, let bm = t.bollMid, let bl = t.bollLower {
+                                GridRow {
+                                    Text(L10n.l("detail.bollinger")).font(.system(size: DS.bodySmallSize)).foregroundStyle(DS.textSecondary)
+                                    Text("上 \(fmt(bu))  中 \(fmt(bm))  下 \(fmt(bl))")
+                                        .font(.system(size: DS.bodySmallSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
+                                    Text(t.currentPrice > bu ? L10n.l("detail.breakUpper") : (t.currentPrice < bl ? L10n.l("detail.breakLower") : L10n.l("detail.inBand")))
+                                        .font(.system(size: DS.tickerSize))
+                                        .foregroundStyle(t.currentPrice > bu ? DS.up : (t.currentPrice < bl ? DS.down : DS.textSecondary))
+                                }
+                            }
+                            if let k = t.kdjK, let d = t.kdjD, let j = t.kdjJ {
+                                GridRow {
+                                    Text("KDJ").font(.system(size: DS.bodySmallSize)).foregroundStyle(DS.textSecondary)
+                                    Text("K \(String(format: "%.1f", k))  D \(String(format: "%.1f", d))  J \(String(format: "%.1f", j))")
+                                        .font(.system(size: DS.bodySmallSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
+                                    Text(k >= 80 ? L10n.l("detail.overbought") : (k <= 20 ? L10n.l("detail.oversold") : L10n.l("detail.neutral")))
+                                        .font(.system(size: DS.tickerSize))
+                                        .foregroundStyle(k >= 80 ? DS.up : (k <= 20 ? DS.down : DS.textSecondary))
+                                }
                             }
                         }
+                    }
 
+                    // 市场情绪（恐惧贪婪指数，仅加密标的）
+                    if symbol.market == .crypto {
                         DSDivider()
-
-                        // 动量与量能
-                        HStack(spacing: 24) {
-                            metricItem(L10n.l("detail.ytd"), value: t.ytdChangePercent.map { fmtPercent($0) } ?? "—",
-                                       color: (t.ytdChangePercent ?? 0) >= 0 ? DS.up : DS.down)
-                            if let pos = t.rangePosition52w {
-                                metricItem(L10n.l("detail.range52w"), value: String(format: "%.0f%%", pos), color: nil)
-                            }
-                            if t.avgVolume20 > 0 {
-                                metricItem(L10n.l("detail.avgVolume20"), value: "\(shortNum(t.avgVolume20))", color: nil)
-                            }
+                        HStack(spacing: 8) {
+                            TectonicIconView(icon: .activity, size: 14, color: DS.textSecondary)
+                            Text(L10n.l("detail.sentiment"))
+                                .font(.system(size: DS.bodySmallSize, weight: .medium))
+                                .foregroundStyle(DS.textSecondary)
                             Spacer()
-                        }
-
-                        DSDivider()
-
-                        // 动量指标（RSI/MACD/KDJ/BOLL）
-                        VStack(alignment: .leading, spacing: 8) {
-                            sectionLabel(L10n.l("detail.momentum"))
-                            Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 8) {
-                                if let rsi = t.rsi14 {
-                                    GridRow {
-                                        Text("RSI(14)").font(.system(size: DS.captionSize)).foregroundStyle(DS.textSecondary)
-                                        Text(String(format: "%.1f", rsi)).font(.system(size: DS.captionSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
-                                        Text(rsi >= 70 ? L10n.l("detail.overbought") : (rsi <= 30 ? L10n.l("detail.oversold") : L10n.l("detail.neutral")))
-                                            .font(.system(size: DS.metaSize))
-                                            .foregroundStyle(rsi >= 70 ? DS.up : (rsi <= 30 ? DS.down : DS.textSecondary))
-                                    }
-                                }
-                                if let dif = t.macdDIF, let dea = t.macdDEA, let hist = t.macdHistogram {
-                                    GridRow {
-                                        Text("MACD").font(.system(size: DS.captionSize)).foregroundStyle(DS.textSecondary)
-                                        Text("DIF \(fmt(dif))  DEA \(fmt(dea))  柱 \(fmt(hist))")
-                                            .font(.system(size: DS.captionSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
-                                        Text(dif >= dea ? L10n.l("detail.bullish") : L10n.l("detail.bearish"))
-                                            .font(.system(size: DS.metaSize))
-                                            .foregroundStyle(dif >= dea ? DS.up : DS.down)
-                                    }
-                                }
-                                if let bu = t.bollUpper, let bm = t.bollMid, let bl = t.bollLower {
-                                    GridRow {
-                                        Text(L10n.l("detail.bollinger")).font(.system(size: DS.captionSize)).foregroundStyle(DS.textSecondary)
-                                        Text("上 \(fmt(bu))  中 \(fmt(bm))  下 \(fmt(bl))")
-                                            .font(.system(size: DS.captionSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
-                                        Text(t.currentPrice > bu ? L10n.l("detail.breakUpper") : (t.currentPrice < bl ? L10n.l("detail.breakLower") : L10n.l("detail.inBand")))
-                                            .font(.system(size: DS.metaSize))
-                                            .foregroundStyle(t.currentPrice > bu ? DS.up : (t.currentPrice < bl ? DS.down : DS.textSecondary))
-                                    }
-                                }
-                                if let k = t.kdjK, let d = t.kdjD, let j = t.kdjJ {
-                                    GridRow {
-                                        Text("KDJ").font(.system(size: DS.captionSize)).foregroundStyle(DS.textSecondary)
-                                        Text("K \(String(format: "%.1f", k))  D \(String(format: "%.1f", d))  J \(String(format: "%.1f", j))")
-                                            .font(.system(size: DS.captionSize).monospacedDigit()).foregroundStyle(DS.textPrimary)
-                                        Text(k >= 80 ? L10n.l("detail.overbought") : (k <= 20 ? L10n.l("detail.oversold") : L10n.l("detail.neutral")))
-                                            .font(.system(size: DS.metaSize))
-                                            .foregroundStyle(k >= 80 ? DS.up : (k <= 20 ? DS.down : DS.textSecondary))
-                                    }
-                                }
-                            }
-                        }
-
-                        // 市场情绪（恐惧贪婪指数，仅加密标的）
-                        if symbol.market == .crypto {
-                            DSDivider()
-                            HStack(spacing: 8) {
-                                TectonicIconView(icon: .activity, size: 14, color: DS.textSecondary)
-                                Text(L10n.l("detail.sentiment"))
-                                    .font(.system(size: DS.metaSize, weight: .medium))
+                            if app.store.fearGreedLoading {
+                                ProgressView().controlSize(.small)
+                            } else if let fg = app.store.fearGreed {
+                                Text("\(fg.value)")
+                                    .font(.system(.body, design: .rounded).weight(.bold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(fg.value >= 55 ? DS.up : (fg.value <= 44 ? DS.down : DS.textSecondary))
+                                Text("\(fg.level)（\(fg.classification)）")
+                                    .font(.system(size: DS.bodySmallSize))
                                     .foregroundStyle(DS.textSecondary)
-                                Spacer()
-                                if app.store.fearGreedLoading {
-                                    ProgressView().controlSize(.small)
-                                } else if let fg = app.store.fearGreed {
-                                    Text("\(fg.value)")
-                                        .font(.system(.body, design: .rounded).weight(.bold))
-                                        .monospacedDigit()
-                                        .foregroundStyle(fg.value >= 55 ? DS.up : (fg.value <= 44 ? DS.down : DS.textSecondary))
-                                    Text("\(fg.level)（\(fg.classification)）")
-                                        .font(.system(size: DS.metaSize))
-                                        .foregroundStyle(DS.textSecondary)
-                                } else {
-                                    Text("—")
-                                        .foregroundStyle(DS.textSecondary)
-                                }
+                            } else {
+                                Text("—")
+                                    .foregroundStyle(DS.textSecondary)
                             }
                         }
                     }
                 }
             }
         }
+        .padding(DS.space4)
+        .background(
+            RoundedRectangle(cornerRadius: DS.radiusCard)
+                .fill(DS.bgPanel)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.radiusCard)
+                        .stroke(DS.border, lineWidth: 1)
+                )
+        )
     }
 
     /// 价位卡片：值 + 距现价 %
     private func levelCard(title: String, value: Double?, current: Double, isBelow: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: DS.metaSize))
+                .font(.system(size: DS.bodySmallSize))
                 .foregroundStyle(DS.textSecondary)
             if let value {
                 Text(fmt(value))
@@ -418,7 +433,7 @@ struct QuoteDetailView: View {
                     .foregroundStyle(DS.textPrimary)
                 let diff = (value - current) / current * 100
                 Text("\(fmtSigned(diff))%")
-                    .font(.system(size: DS.metaSize).monospacedDigit())
+                    .font(.system(size: DS.tickerSize).monospacedDigit())
                     .foregroundStyle(isBelow ? DS.down : DS.up)
             } else {
                 Text("—")
@@ -435,22 +450,22 @@ struct QuoteDetailView: View {
     private func maRow(_ name: String, value: Double?, current: Double) -> some View {
         GridRow {
             Text(name)
-                .font(.system(size: DS.captionSize))
+                .font(.system(size: DS.bodySmallSize))
                 .foregroundStyle(DS.textSecondary)
             if let value {
                 Text(fmt(value))
-                    .font(.system(size: DS.captionSize).monospacedDigit())
+                    .font(.system(size: DS.bodySmallSize).monospacedDigit())
                     .foregroundStyle(DS.textPrimary)
                 let above = current >= value
                 Text(above ? L10n.l("detail.aboveMA") : L10n.l("detail.belowMA"))
-                    .font(.system(size: DS.metaSize))
+                    .font(.system(size: DS.tickerSize))
                     .foregroundStyle(above ? DS.up : DS.down)
                 Text("\(fmtPercent((current - value) / value * 100))")
-                    .font(.system(size: DS.metaSize).monospacedDigit())
+                    .font(.system(size: DS.tickerSize).monospacedDigit())
                     .foregroundStyle(DS.textSecondary)
             } else {
                 Text(L10n.l("detail.noData"))
-                    .font(.system(size: DS.metaSize))
+                    .font(.system(size: DS.tickerSize))
                     .foregroundStyle(DS.textTertiary)
             }
         }
@@ -459,7 +474,7 @@ struct QuoteDetailView: View {
     private func metricItem(_ title: String, value: String, color: Color?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: DS.metaSize))
+                .font(.system(size: DS.bodySmallSize))
                 .foregroundStyle(DS.textSecondary)
             Text(value)
                 .font(.system(size: 17, weight: .semibold).monospacedDigit())
@@ -515,11 +530,11 @@ struct WatchlistToggle: View {
         } label: {
             TectonicIconView(icon: inList ? .starFilled : .star,
                              size: 18,
-                             color: inList ? DS.accent : DS.textSecondary)
+                             color: inList ? DS.up : DS.textSecondary)
                 .padding(6)
                 .background(
                     RoundedRectangle(cornerRadius: DS.radiusMedium)
-                        .fill(inList ? DS.bgSelected : .clear)
+                        .fill(inList ? DS.upBg : .clear)
                 )
         }
         .buttonStyle(.plain)
