@@ -216,34 +216,6 @@ struct ChatPanelView: View {
 
     private var inputArea: some View {
         VStack(spacing: 8) {
-            // 快捷问题（轻量：一行小字 chips）
-            if !context.quickQuestions.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(context.quickQuestions, id: \.0) { q in
-                        Button {
-                            send(q.1)
-                        } label: {
-                            Text(q.0)
-                                .font(.system(size: 10.5, weight: .medium))
-                                .foregroundStyle(DS.textSecondary)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 3.5)
-                                .background(
-                                    Capsule().fill(DS.bgHover.opacity(0.9))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isThinking)
-                    }
-                    Spacer()
-                    if !searchedSources.isEmpty {
-                        Text("\(searchedSources.count) 源")
-                            .font(.system(size: 10).monospacedDigit())
-                            .foregroundStyle(DS.textTertiary)
-                    }
-                }
-            }
-
             // 输入行
             HStack(spacing: 8) {
                 TextField(L10n.l("chat.askHint"), text: $input, axis: .vertical)
