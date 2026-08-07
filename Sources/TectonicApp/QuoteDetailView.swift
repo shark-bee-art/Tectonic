@@ -58,17 +58,22 @@ struct QuoteDetailView: View {
             DSCapsLabel(text: "\(symbol.code) · \(symbol.market.displayName)")
 
             if let quote {
-                HStack(alignment: .center, spacing: DS.space3) {
+                HStack(alignment: .firstTextBaseline, spacing: DS.space3) {
                     // 40pt Hero 大数字
                     Text(fmt(quote.price))
                         .font(.system(size: DS.heroSize, weight: .bold).monospacedDigit())
                         .kerning(-0.5)
                         .foregroundStyle(DS.directionColor(quote.change))
+                    // 货币（跟在价格后）
+                    Text(symbol.currency)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(DS.textTertiary)
                     // 涨跌（Day Change，无底色纯文字）
                     Text("\(fmtSigned(quote.change)) (\(fmtPercent(quote.changePercent)))")
                         .font(.system(size: 16, weight: .medium).monospacedDigit())
                         .foregroundStyle(DS.directionColor(quote.change))
-                    // 收藏按钮（与价格同高，稍放大）
+                    Spacer()
+                    // 收藏按钮（无背景，靠右侧）
                     WatchlistToggle(symbol: symbol, size: 22)
                 }
                 Text("今开 \(fmt(quote.open))  最高 \(fmt(quote.high))  最低 \(fmt(quote.low))  昨收 \(fmt(quote.prevClose))")
@@ -79,10 +84,6 @@ struct QuoteDetailView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 80)
             }
-
-            Text(symbol.currency)
-                .font(.system(size: DS.bodySmallSize))
-                .foregroundStyle(DS.textTertiary)
         }
         .padding(.bottom, DS.space2)
     }
@@ -605,11 +606,7 @@ struct WatchlistToggle: View {
             TectonicIconView(icon: inList ? .starFilled : .star,
                              size: size,
                              color: inList ? DS.up : DS.textSecondary)
-                .padding(6)
-                .background(
-                    RoundedRectangle(cornerRadius: DS.radiusMedium)
-                        .fill(inList ? DS.upBg : .clear)
-                )
+                .padding(4)
         }
         .buttonStyle(.plain)
         .symbolEffect(.bounce, value: inList)
