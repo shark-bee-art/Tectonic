@@ -137,6 +137,7 @@ public struct TencentSource: MarketDataSource, Sendable {
             case .day: periodParam = "day"
             case .week: periodParam = "week"
             case .month: periodParam = "month"
+            case .year: periodParam = "month" // 年K由注册表聚合
             case .m5: periodParam = "m5"
             }
             urlStr = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=\(code),\(periodParam),,,\(limit),qfq"

@@ -168,6 +168,7 @@ public struct YahooSource: MarketDataSource, Sendable {
         case .day:  (interval, range) = ("1d", "2y")     // ~500 根日线
         case .week: (interval, range) = ("1wk", "10y")
         case .month:(interval, range) = ("1mo", "max")
+        case .year:  (interval, range) = ("1mo", "max") // 年K由注册表聚合
         case .m5:   (interval, range) = ("5m", "1d")
         }
         let urlStr = "https://query1.finance.yahoo.com/v8/finance/chart/\(code)?interval=\(interval)&range=\(range)"

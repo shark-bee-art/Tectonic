@@ -16,12 +16,19 @@ struct QuoteDetailView: View {
     @State private var isLoadingFund = false
     @State private var fundError: String?
 
+    // K 线
+    @State private var klinePeriod: KLinePeriod = .day
+    @State private var klineBars: [KLineBar] = []
+    @State private var isLoadingKline = false
+    @State private var klineError: String?
+
     var body: some View {
         ZStack(alignment: .bottom) {
-            // 可滚动内容（header / 技术面 / 基本面）
+            // 可滚动内容（header / K线 / 技术面 / 基本面）
             ScrollView {
                 VStack(alignment: .leading, spacing: DS.space8) {
                     header
+                    klineSection
                     technicalSection
                     fundamentalSection
                 }
@@ -46,6 +53,12 @@ struct QuoteDetailView: View {
             if symbol.market == .crypto {
                 await app.store.fetchFearGreed()
             }
+        }
+        .task(id: "\(symbol.id)-kline-\(klinePeriod.rawValue)") {
+            await loadKLine()
+        }
+        .onChange(of: klinePeriod) { _, _ in
+            Task { await loadKLine() }
         }
     }
 
@@ -374,6 +387,56 @@ struct QuoteDetailView: View {
                         .stroke(DS.border, lineWidth: 1)
                 )
         )
+    }
+
+    // MARK: K 线板块（日/周/月/年）
+
+    private var klineSection: some View {
+        VStack(alignment: .leading, spacing: DS.space3) {
+            HStack {
+                TectonicIconView(icon: .candle, size: 15, color: DS.textPrimary)
+                Text(L10n.l("detail.kline"))
+                    .font(.system(size: DS.sectionHeaderSize, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                Spacer()
+                // 周期切换
+                KLinePeriodPicker(period: $klinePeriod)
+            }
+
+            if isLoadingKline && klineBars.isEmpty {
+                DSPlaceholder(icon: .refresh, title: L10n.l("common.loading"))
+                    .frame(height: 280)
+            } else if let klineError, klineBars.isEmpty {
+                DSPlaceholder(icon: .alertTriangle, title: klineError,
+                              actionTitle: L10n.l("common.refresh"),
+                              action: { Task { await loadKLine() } })
+                    .frame(height: 280)
+            } else {
+                KLineChartView(bars: klineBars, height: 280)
+            }
+        }
+        .padding(DS.space4)
+        .background(
+            RoundedRectangle(cornerRadius: DS.radiusCard)
+                .fill(DS.bgPanel)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.radiusCard)
+                        .stroke(DS.border, lineWidth: 1)
+                )
+        )
+    }
+
+    private func loadKLine() async {
+        isLoadingKline = true
+        defer { isLoadingKline = false }
+        do {
+            let limit = klinePeriod == .year ? 60 : 160
+            klineBars = try await app.store.kline(for: symbol, period: klinePeriod, limit: limit)
+            klineError = nil
+        } catch {
+            klineBars = []
+            klineError = "K线加载失败: \(error.localizedDescription)"
+        }
     }
 
     // MARK: 底部模型对话框（固定悬浮，居中，横跨内容区 75%，玻璃质感）

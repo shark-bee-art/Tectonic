@@ -177,6 +177,11 @@ public final class MarketDataSourceRegistry: Sendable {
     }
 
     public func fetchKLine(for symbol: Symbol, period: KLinePeriod, limit: Int = 320) async throws -> [KLineBar] {
+        // 年K：拉月K数据本地聚合（各源原生不支持年线）
+        if period == .year {
+            let monthBars = try await fetchKLine(for: symbol, period: .month, limit: max(limit * 12, 120))
+            return KLineAggregator.aggregate(monthBars, to: .year)
+        }
         let candidates = sources(for: symbol.market)
         // 所有候选源都试，取数据最全的（腾讯国际 K线历史少时自动用 Yahoo 补齐）
         var best: [KLineBar] = []
@@ -203,5 +208,54 @@ public final class MarketDataSourceRegistry: Sendable {
             throw DataSourceError.notSupported("\(symbol.market.displayName) \(period.displayName) 数据源被限流，请稍后重试")
         }
         throw lastError ?? DataSourceError.emptyData("K线数据为空")
+    }
+}
+
+// MARK: - K 线聚合（周/月/年）
+
+/// 将低周期 K 线聚合为高周期（月K → 年K；日K → 周K 等）
+enum KLineAggregator {
+    static func aggregate(_ bars: [KLineBar], to period: KLinePeriod) -> [KLineBar] {
+        guard !bars.isEmpty else { return [] }
+        // 按时间分桶：周 → ISO 周、月 → 年月、年 → 年份
+        let cal = Calendar(identifier: .gregorian)
+        var buckets: [String: [KLineBar]] = [:]
+        for bar in bars {
+            let key: String
+            switch period {
+            case .week:
+                let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: bar.time)
+                key = "\\(comps.yearForWeekOfYear ?? 0)-W\\(comps.weekOfYear ?? 0)"
+            case .month:
+                let comps = cal.dateComponents([.year, .month], from: bar.time)
+                key = "\\(comps.year ?? 0)-\\(comps.month ?? 0)"
+            case .year:
+                let comps = cal.dateComponents([.year], from: bar.time)
+                key = "\\(comps.year ?? 0)"
+            default:
+                key = String(bar.time.timeIntervalSince1970)
+            }
+            buckets[key, default: []].append(bar)
+        }
+        let sortedKeys = buckets.keys.sorted { a, b in
+            // 自然排序即可（ISO 周 / 年月 / 年份都按字典序 = 时间序）
+            a < b
+        }
+        var result: [KLineBar] = []
+        for key in sortedKeys {
+            let group = buckets[key]!.sorted { $0.time < $1.time }
+            guard let first = group.first, let last = group.last else { continue }
+            result.append(KLineBar(
+                symbolId: first.symbolId,
+                period: period,
+                time: first.time,
+                open: first.open,
+                high: group.map(\.high).max() ?? first.high,
+                low: group.map(\.low).min() ?? first.low,
+                close: last.close,
+                volume: group.reduce(0) { $0 + $1.volume }
+            ))
+        }
+        return result
     }
 }

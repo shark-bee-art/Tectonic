@@ -160,6 +160,8 @@ public enum L10n {
         "detail.belowMA": ["zh": "现价在下方", "en": "Price below", "ja": "価格は下"],
         "detail.noData": ["zh": "数据不足", "en": "Insufficient data", "ja": "データ不足"],
         "detail.aiChat": ["zh": "AI 分析", "en": "AI Analysis", "ja": "AI分析"],
+        "detail.kline": ["zh": "K线", "en": "K-Line", "ja": "ローソク足"],
+        "detail.klineEmpty": ["zh": "暂无K线数据", "en": "No K-line data", "ja": "ローソク足データなし"],
         "detail.quickTrend": ["zh": "走势如何", "en": "Trend", "ja": "トレンド"],
         "detail.quickFundamental": ["zh": "基本面", "en": "Fundamentals", "ja": "ファンダメンタル"],
         "detail.quickNews": ["zh": "近期新闻", "en": "Recent News", "ja": "最近のニュース"],

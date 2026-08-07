@@ -78,6 +78,8 @@ public struct TwseSource: MarketDataSource, Sendable {
             return aggregate(daily, by: .weekOfYear).suffix(limit)
         case .month:
             return aggregate(daily, by: .month).suffix(limit)
+        case .year:
+            return aggregate(daily, by: .year).suffix(limit)
         case .m5:
             return []
         }

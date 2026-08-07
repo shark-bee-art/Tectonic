@@ -54,6 +54,7 @@ public struct BinanceSource: MarketDataSource, Sendable {
         case .day: interval = "1d"
         case .week: interval = "1w"
         case .month: interval = "1M"
+        case .year: interval = "1M" // 年K由注册表聚合
         case .m5: interval = "5m"
         }
         let urlStr = "https://api.binance.com/api/v3/klines?symbol=\(sym)&interval=\(interval)&limit=\(min(limit, 1000))"

@@ -109,6 +109,7 @@ public struct CoinGeckoSource: MarketDataSource, Sendable {
         case .day: days = min(limit, 365)
         case .week: days = min(limit * 7, 730)
         case .month: days = min(limit * 30, 3650)
+        case .year: days = min(limit * 365, 3650)
         case .m5: days = 1
         }
         let urlStr = "https://api.coingecko.com/api/v3/coins/\(id)/ohlc?vs_currency=usd&days=\(days)"
@@ -130,6 +131,8 @@ public struct CoinGeckoSource: MarketDataSource, Sendable {
             return aggregate(bars, by: .weekOfYear).suffix(limit)
         case .month:
             return aggregate(bars, by: .month).suffix(limit)
+        case .year:
+            return aggregate(bars, by: .year).suffix(limit)
         case .m5:
             return []
         }

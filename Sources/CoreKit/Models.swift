@@ -112,6 +112,7 @@ public enum KLinePeriod: String, Codable, Sendable, CaseIterable {
     case day   // 日K
     case week  // 周K
     case month // 月K
+    case year  // 年K（月K聚合）
     /// 分时暂用 5 分钟线实现
     case m5
 
@@ -120,6 +121,7 @@ public enum KLinePeriod: String, Codable, Sendable, CaseIterable {
         case .day: "日K"
         case .week: "周K"
         case .month: "月K"
+        case .year: "年K"
         case .m5: "分时"
         }
     }
