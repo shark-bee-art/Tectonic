@@ -351,7 +351,7 @@ struct AISettingsTab: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(group)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(DS.textSecondary)
                             .padding(.top, 4)
                         ForEach(ModelProvider.allCases.filter { $0.group == group }) { p in
                             ProviderRow(provider: p)
@@ -381,7 +381,7 @@ struct AISettingsTab: View {
                      ? L10n.l("common.loading")
                      : "\(L10n.l("settings.modelUpdated")) · \(availableModels.count)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(DS.textSecondary)
             }
 
             Section(L10n.l("chat.webSearch")) {
@@ -403,7 +403,7 @@ struct AISettingsTab: View {
                          ? "未配置 → 自动回退内置资讯源检索"
                          : "已配置 → 问询前联网检索")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(DS.textSecondary)
                     Spacer()
                     Button("去官网申请") {
                         if let url = URL(string: app.settings.searchProvider.signupURL) {
@@ -435,6 +435,7 @@ struct AISettingsTab: View {
             }
         }
         .formStyle(.grouped)
+        .padding(12)  // 与其他设置页一致
         .onAppear {
             loadModels()
             syncModelSelection()
