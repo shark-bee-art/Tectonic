@@ -28,10 +28,6 @@ struct ContentView: View {
             case .newsFeed(let id):
                 // 独立查看某个订阅源（category 取该源所属分类）
                 NewsListView(category: app.store.newsFeeds.first { $0.id == id }?.category ?? .flash, sourceID: id)
-            case .holdings:
-                HoldingsView()
-            case .transactions:
-                TransactionsView()
             }
         } detail: {
             switch app.selectedTab {
@@ -49,8 +45,6 @@ struct ContentView: View {
                 } else {
                     PlaceholderView()
                 }
-            case .holdings, .transactions:
-                PlaceholderView()
             }
         }
         .toolbar {
@@ -135,12 +129,6 @@ struct SidebarView: View {
                 } label: {
                     Label(L10n.l("sidebar.calendar"), systemImage: "calendar")
                 }
-            }
-            Section(L10n.l("sidebar.assets")) {
-                Label(L10n.l("sidebar.holdings"), systemImage: "briefcase")
-                    .tag(AppState.SidebarItem.holdings)
-                Label(L10n.l("sidebar.transactions"), systemImage: "list.bullet.rectangle")
-                    .tag(AppState.SidebarItem.transactions)
             }
         }
         .listStyle(.sidebar)

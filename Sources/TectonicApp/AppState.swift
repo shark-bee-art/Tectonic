@@ -35,8 +35,6 @@ final class AppState: ObservableObject {
         case newsCalendar
         /// 独立查看某个资讯源（sourceID = NewsFeed.id）
         case newsFeed(sourceID: String)
-        case holdings
-        case transactions
 
         /// 侧边栏显示名
         var title: String {
@@ -48,8 +46,6 @@ final class AppState: ObservableObject {
             case .newsEarnings: "财报"
             case .newsCalendar: "日历"
             case .newsFeed: "订阅源"
-            case .holdings: "持仓"
-            case .transactions: "交易记录"
             }
         }
     }
@@ -76,12 +72,12 @@ final class AppState: ObservableObject {
     // 行情自动刷新（60s）
     private var refreshTimer: Timer?
 
-    /// 刷新自选 + 持仓行情
+    /// 刷新自选行情
     func refreshAll() async {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        await store.refreshPortfolioQuotes()
+        await store.refreshQuotes()
     }
 
     /// 首次启动自动刷一次 + 导入内置标的/订阅源 + 启动定时刷新
