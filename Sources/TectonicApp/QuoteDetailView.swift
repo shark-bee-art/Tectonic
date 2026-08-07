@@ -17,16 +17,22 @@ struct QuoteDetailView: View {
     @State private var fundError: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: DS.space8) {
-                header
-                technicalSection
-                fundamentalSection
-                aiChatSection
+        ZStack(alignment: .bottom) {
+            // 可滚动内容（header / 技术面 / 基本面）
+            ScrollView {
+                VStack(alignment: .leading, spacing: DS.space8) {
+                    header
+                    technicalSection
+                    fundamentalSection
+                }
+                .padding(DS.space6)
+                .padding(.bottom, 200)  // 底部留白，保证最后内容可滚到对话框上方
+                .frame(maxWidth: 860, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-            .padding(DS.space6)
-            .frame(maxWidth: 860, alignment: .leading)
-            .frame(maxWidth: .infinity)
+
+            // 底部固定悬浮 AI 对话框（不随内容滚动，浮于文字上方）
+            aiChatSection
         }
         .background(DS.bgApp)
         .task(id: symbol.id) {
@@ -371,7 +377,7 @@ struct QuoteDetailView: View {
         )
     }
 
-    // MARK: 底部模型对话框（居中，横跨内容区 75%）
+    // MARK: 底部模型对话框（固定悬浮，居中，横跨内容区 75%）
 
     private var aiChatSection: some View {
         VStack(alignment: .leading, spacing: DS.space3) {
@@ -443,6 +449,19 @@ struct QuoteDetailView: View {
             .frame(maxWidth: 645)  // 860 内容区 75%
             .frame(maxWidth: .infinity)  // 水平居中
         }
+        .padding(DS.space4)
+        .frame(maxWidth: .infinity)
+        // 背景遮罩：内容从下方滑过时被遮挡（浮于文字上方）
+        .background(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: DS.bgApp.opacity(0.92), location: 0.35),
+                    .init(color: DS.bgApp, location: 0.7),
+                ],
+                startPoint: .top, endPoint: .bottom
+            )
+        )
     }
 
     @State private var chatInput = ""
