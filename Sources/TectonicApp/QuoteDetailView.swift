@@ -377,18 +377,10 @@ struct QuoteDetailView: View {
         )
     }
 
-    // MARK: 底部模型对话框（固定悬浮，居中，横跨内容区 75%）
+    // MARK: 底部模型对话框（固定悬浮，居中，横跨内容区 75%，玻璃质感）
 
     private var aiChatSection: some View {
-        VStack(alignment: .leading, spacing: DS.space3) {
-            HStack(spacing: 8) {
-                TectonicIconView(icon: .sparkles, size: 16, color: DS.up)
-                Text(L10n.l("detail.aiChat"))
-                    .font(.system(size: DS.sectionHeaderSize, weight: .semibold))
-                    .foregroundStyle(DS.textPrimary)
-                Spacer()
-            }
-
+        VStack(spacing: DS.space3) {
             // 对话框：输入框 + 快速问题
             VStack(spacing: DS.space3) {
                 HStack(spacing: 8) {
@@ -416,10 +408,10 @@ struct QuoteDetailView: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: DS.radiusCard)
-                        .fill(DS.bgSurface)
+                        .fill(.white.opacity(0.35))
                         .overlay(
                             RoundedRectangle(cornerRadius: DS.radiusCard)
-                                .stroke(DS.border, lineWidth: 1)
+                                .stroke(.white.opacity(0.35), lineWidth: 1)
                         )
                 )
 
@@ -439,25 +431,30 @@ struct QuoteDetailView: View {
             }
             .padding(DS.space4)
             .background(
-                RoundedRectangle(cornerRadius: DS.radiusCard)
-                    .fill(DS.bgPanel)
+                // 玻璃质感：超薄材质 + 细边框 + 柔和阴影
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(.ultraThinMaterial)
                     .overlay(
-                        RoundedRectangle(cornerRadius: DS.radiusCard)
-                            .stroke(DS.border, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(.white.opacity(0.3), lineWidth: 1)
                     )
+                    .shadow(color: .black.opacity(0.12), radius: 20, y: 8)
             )
             .frame(maxWidth: 645)  // 860 内容区 75%
             .frame(maxWidth: .infinity)  // 水平居中
         }
-        .padding(DS.space4)
+        .padding(.horizontal, DS.space4)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
         .frame(maxWidth: .infinity)
-        // 背景遮罩：内容从下方滑过时被遮挡（浮于文字上方）
+        // 底部渐变遮罩：内容从下方滑过时柔化（轻盈过渡，不硬切）
         .background(
             LinearGradient(
                 stops: [
                     .init(color: .clear, location: 0),
-                    .init(color: DS.bgApp.opacity(0.92), location: 0.35),
-                    .init(color: DS.bgApp, location: 0.7),
+                    .init(color: DS.bgApp.opacity(0.55), location: 0.4),
+                    .init(color: DS.bgApp.opacity(0.95), location: 0.75),
+                    .init(color: DS.bgApp, location: 1),
                 ],
                 startPoint: .top, endPoint: .bottom
             )

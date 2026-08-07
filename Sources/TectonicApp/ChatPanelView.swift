@@ -50,13 +50,17 @@ struct ChatPanelView: View {
             inputArea
         }
         .frame(width: 500, height: 340)
-        .background(DS.bgPanel)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(DS.border, lineWidth: 1)
+        // 玻璃质感：超薄材质 + 细边框 + 柔和阴影
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(.white.opacity(0.3), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
         )
-        .shadow(color: .black.opacity(0.15), radius: 16, y: 4)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
     private var header: some View {
