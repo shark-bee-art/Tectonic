@@ -172,7 +172,7 @@ struct ChatPanelView: View {
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
                             .fill(isUser ? DS.accent.opacity(0.12) : DS.bgHover.opacity(0.85))
                     )
-                    .frame(maxWidth: isUser ? 420 : 560, alignment: isUser ? .trailing : .leading)
+                    .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
             }
             if isUser {
                 Spacer(minLength: 0)
