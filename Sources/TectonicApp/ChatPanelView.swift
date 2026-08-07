@@ -74,14 +74,6 @@ struct ChatPanelView: View {
                     Text(ai.model)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(DS.textTertiary)
-                    if ai.webSearchEnabled {
-                        HStack(spacing: 2) {
-                            TectonicIconView(icon: .globe, size: 9, color: DS.accent)
-                            Text(L10n.l("chat.webSearchOn"))
-                                .font(.system(size: 9.5))
-                                .foregroundStyle(DS.accent)
-                        }
-                    }
                 }
             }
             Spacer()
