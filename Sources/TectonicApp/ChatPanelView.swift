@@ -10,6 +10,8 @@ struct ChatPanelContext: Identifiable {
     /// 构建 system prompt：参数为联网检索到的资讯（空串表示未联网/无结果）
     let systemBuilder: @MainActor (String) -> String
     let quickQuestions: [(String, String)]
+    /// 打开时自动发送的初始问题（详情页底部对话框预填）
+    var initialQuestion: String? = nil
 }
 
 struct ChatPanelView: View {
@@ -20,6 +22,7 @@ struct ChatPanelView: View {
     @State private var input = ""
     @State private var isThinking = false
     @State private var searchedSources: [String] = []
+    @State private var didSendInitial = false
     @FocusState private var inputFocused: Bool
 
     private var ai: AISettings { app.aiSettings }
@@ -27,6 +30,13 @@ struct ChatPanelView: View {
     var body: some View {
         panel
             .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
+            .onAppear {
+                // 自动发送初始问题（详情页底部对话框唤起）
+                if !didSendInitial, let q = context.initialQuestion, !q.isEmpty {
+                    didSendInitial = true
+                    send(q)
+                }
+            }
     }
 
     // MARK: 面板主体（底部悬浮，固定高度可滚动）

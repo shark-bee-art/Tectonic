@@ -22,31 +22,13 @@ struct QuoteDetailView: View {
                 header
                 technicalSection
                 fundamentalSection
+                aiChatSection
             }
             .padding(DS.space6)
             .frame(maxWidth: 860, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .background(DS.bgApp)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    openChat()
-                } label: {
-                    HStack(spacing: 4) {
-                        TectonicIconView(icon: .sparkles, size: 14, color: DS.up)
-                        Text(L10n.l("detail.aiChat"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(DS.textPrimary)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(RoundedRectangle(cornerRadius: DS.radiusMedium).fill(DS.bgHover))
-                }
-                .buttonStyle(.plain)
-                .help(L10n.l("detail.aiChat"))
-            }
-        }
         .task(id: symbol.id) {
             quote = await app.store.quote(for: symbol)
         }
@@ -61,40 +43,7 @@ struct QuoteDetailView: View {
         }
     }
 
-    /// 打开右侧 AI 问询面板（系统提示含行情 + 可选联网资讯）
-    private func openChat() {
-        let symbol = self.symbol
-        let name = symbol.name
-        let code = symbol.code
-        let marketName = symbol.market.displayName
-        app.chatPanel = ChatPanelContext(
-            title: "\(name)（\(code)）",
-            subtitle: L10n.l("placeholder.detail"),
-            systemBuilder: { webContext in
-                let quoteText: String
-                if let q = app.store.quotes[symbol.id] {
-                    quoteText = String(format: "现价 %.4f，涨跌 %+.2f%%（昨收 %.4f）", q.price, q.changePercent, q.prevClose)
-                } else {
-                    quoteText = "暂无实时行情数据"
-                }
-                var sys = """
-                你是专业的财经分析助手，分析标的是 \(name)（\(code)，\(marketName)）。
-                当前行情：\(quoteText)。
-                \(app.settings.languageInstruction) 基于公开信息分析，明确指出不确定性和风险，不要给出确定性的投资建议。
-                """
-                if !webContext.isEmpty {
-                    sys += "\n\n以下是检索到的相关资讯（联网，请优先参考）：\n\(webContext)"
-                }
-                return sys
-            },
-            quickQuestions: [
-                (L10n.l("detail.quickTrend"), "最近走势如何？技术面怎么看？"),
-                (L10n.l("detail.quickFundamental"), "基本面情况怎么样？关键财务指标如何？"),
-                (L10n.l("detail.quickNews"), "近期有哪些重要新闻？有什么风险点？"),
-            ]
-        )
-    }
-
+    /// 打开 AI 问询面板（系统提示含行情 + 可选联网资讯）——已迁移至底部对话框 sendChat
     // MARK: 行情 Hero（RH Portfolio Hero 结构：标签 + 40pt 大数字 + 涨跌）
 
     private var header: some View {
@@ -419,6 +368,127 @@ struct QuoteDetailView: View {
                     RoundedRectangle(cornerRadius: DS.radiusCard)
                         .stroke(DS.border, lineWidth: 1)
                 )
+        )
+    }
+
+    // MARK: 底部模型对话框（居中，横跨内容区 75%）
+
+    private var aiChatSection: some View {
+        VStack(alignment: .leading, spacing: DS.space3) {
+            HStack(spacing: 8) {
+                TectonicIconView(icon: .sparkles, size: 16, color: DS.up)
+                Text(L10n.l("detail.aiChat"))
+                    .font(.system(size: DS.sectionHeaderSize, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                Spacer()
+            }
+
+            // 对话框：输入框 + 快速问题
+            VStack(spacing: DS.space3) {
+                HStack(spacing: 8) {
+                    TectonicIconView(icon: .sparkles, size: 15, color: DS.up)
+                    TextField(L10n.l("placeholder.detail"), text: $chatInput)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 14))
+                        .onSubmit { sendChat() }
+                    Button {
+                        sendChat()
+                    } label: {
+                        HStack(spacing: 5) {
+                            TectonicIconView(icon: .send, size: 14, color: .white)
+                            Text(L10n.l("chat.send"))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: DS.radiusMedium).fill(DS.tradeButton))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: DS.radiusCard)
+                        .fill(DS.bgSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DS.radiusCard)
+                                .stroke(DS.border, lineWidth: 1)
+                        )
+                )
+
+                // 快速问题
+                HStack(spacing: 8) {
+                    quickChip(L10n.l("detail.quickTrend")) {
+                        sendChat("最近走势如何？技术面怎么看？")
+                    }
+                    quickChip(L10n.l("detail.quickFundamental")) {
+                        sendChat("基本面情况怎么样？关键财务指标如何？")
+                    }
+                    quickChip(L10n.l("detail.quickNews")) {
+                        sendChat("近期有哪些重要新闻？有什么风险点？")
+                    }
+                    Spacer()
+                }
+            }
+            .padding(DS.space4)
+            .background(
+                RoundedRectangle(cornerRadius: DS.radiusCard)
+                    .fill(DS.bgPanel)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DS.radiusCard)
+                            .stroke(DS.border, lineWidth: 1)
+                    )
+            )
+            .frame(maxWidth: 645)  // 860 内容区 75%
+            .frame(maxWidth: .infinity)  // 水平居中
+        }
+    }
+
+    @State private var chatInput = ""
+
+    private func quickChip(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(DS.accent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: DS.radiusMedium).fill(DS.bgHover))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sendChat(_ preset: String? = nil) {
+        let q: String
+        if let preset {
+            q = preset
+        } else {
+            q = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !q.isEmpty else { return }
+        }
+        chatInput = ""
+        // 唤起底部悬浮 AI 对话框，自动发送问题
+        app.chatPanel = ChatPanelContext(
+            title: "\(symbol.name)（\(symbol.code)）",
+            subtitle: L10n.l("placeholder.detail"),
+            systemBuilder: { webContext in
+                var sys = "你是专业的财经分析助手，分析标的是 \(symbol.name)（\(symbol.code)，\(symbol.market.displayName)）。"
+                if let q = app.store.quotes[symbol.id] {
+                    sys += " 当前行情：现价 \(String(format: "%.4f", q.price))，涨跌 \(String(format: "%+.2f%%", q.changePercent))。"
+                }
+                sys += " \(app.settings.languageInstruction) 基于公开信息分析，明确指出不确定性和风险，不要给出确定性的投资建议。"
+                if !webContext.isEmpty {
+                    sys += "\n\n以下是检索到的相关资讯（联网，请优先参考）：\n\(webContext)"
+                }
+                return sys
+            },
+            quickQuestions: [
+                (L10n.l("detail.quickTrend"), "最近走势如何？技术面怎么看？"),
+                (L10n.l("detail.quickFundamental"), "基本面情况怎么样？关键财务指标如何？"),
+                (L10n.l("detail.quickNews"), "近期有哪些重要新闻？有什么风险点？"),
+            ],
+            initialQuestion: q
         )
     }
 

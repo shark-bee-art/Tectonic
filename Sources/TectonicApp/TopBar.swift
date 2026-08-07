@@ -18,7 +18,7 @@ struct TopBar: View {
                 Spacer()
                 // 右侧：搜索栏 + 刷新
                 actionArea
-                    .frame(width: 380)
+                    .frame(width: 410)
             }
             .frame(height: 52)
         }
@@ -28,7 +28,7 @@ struct TopBar: View {
     // MARK: 四 tab（自选 / 行情 / 快讯 / 日历）
 
     private var tabArea: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 16) {
             tabButton(icon: .star, title: L10n.l("sidebar.watchlist"),
                       selected: app.selectedTab == .watchlist) {
                 select(.watchlist)
@@ -37,7 +37,7 @@ struct TopBar: View {
                       selected: app.selectedTab == .markets) {
                 select(.markets)
             }
-            // 快讯（含来源菜单）
+            // 快讯（bolt 图标 + 来源菜单）
             Menu {
                 Button {
                     select(.flash)
@@ -55,17 +55,17 @@ struct TopBar: View {
                     }
                 }
             } label: {
-                HStack(spacing: 5) {
-                    TectonicIconView(icon: .bolt, size: 15,
+                HStack(spacing: 6) {
+                    TectonicIconView(icon: .bolt, size: 17,
                                      color: app.selectedTab.isNewsTab ? DS.textPrimary : DS.textSecondary)
                     Text(app.selectedTab.isNewsTab ? currentNewsTitle : L10n.l("sidebar.flash"))
-                        .font(.system(size: 15, weight: app.selectedTab.isNewsTab ? .semibold : .regular))
+                        .font(.system(size: 17, weight: app.selectedTab.isNewsTab ? .semibold : .regular))
                         .foregroundStyle(app.selectedTab.isNewsTab ? DS.textPrimary : DS.textSecondary)
                         .lineLimit(1)
                     TectonicIconView(icon: .chevronDown, size: 11, color: DS.textTertiary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: DS.radiusCard)
                         .fill(app.selectedTab.isNewsTab ? DS.bgSelected : .clear)
@@ -96,13 +96,13 @@ struct TopBar: View {
     private func tabButton(icon: TectonicIcon, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                TectonicIconView(icon: icon, size: 15, color: selected ? DS.textPrimary : DS.textSecondary)
+                TectonicIconView(icon: icon, size: 17, color: selected ? DS.textPrimary : DS.textSecondary)
                 Text(title)
-                    .font(.system(size: 15, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 17, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: DS.radiusCard)
                     .fill(selected ? DS.bgSelected : .clear)
@@ -123,7 +123,7 @@ struct TopBar: View {
         HStack(spacing: 6) {
             // 搜索标的 → 添加到自选
             SymbolSearchField()
-                .frame(width: 280)
+                .frame(width: 300)
             // 刷新
             if app.isRefreshing {
                 TectonicIconView(icon: .refresh, size: 16, color: DS.textSecondary)
@@ -152,7 +152,7 @@ struct SymbolSearchField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .top) {
             // 输入框
             HStack(spacing: 6) {
                 TectonicIconView(icon: .search, size: 14,
@@ -191,7 +191,7 @@ struct SymbolSearchField: View {
                     )
             )
 
-            // 搜索结果下拉（最多 6 条，避免过高）
+            // 搜索结果下拉（overlay 悬浮，不占布局空间，避免与下方内容重叠）
             if focused && !results.isEmpty {
                 VStack(spacing: 1) {
                     ForEach(results.prefix(6)) { symbol in
@@ -199,18 +199,22 @@ struct SymbolSearchField: View {
                     }
                 }
                 .padding(4)
+                .frame(width: 300)
                 .background(
                     RoundedRectangle(cornerRadius: DS.radiusCard)
                         .fill(DS.bgPanel)
-                        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
+                        .shadow(color: .black.opacity(0.15), radius: 14, y: 6)
                         .overlay(
                             RoundedRectangle(cornerRadius: DS.radiusCard)
                                 .stroke(DS.border, lineWidth: 1)
                         )
                 )
+                .offset(y: 40)  // 悬浮在输入框正下方
+                .zIndex(50)
                 .transition(.opacity)
             }
         }
+        .frame(width: 300)
     }
 
     private func searchResultRow(_ symbol: Symbol) -> some View {

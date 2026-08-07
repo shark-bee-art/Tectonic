@@ -183,6 +183,7 @@ public enum L10n {
         "chat.webSearchOn": ["zh": "联网", "en": "Web", "ja": "オンライン"],
         "chat.clear": ["zh": "清空对话", "en": "Clear chat", "ja": "会話をクリア"],
         "chat.open": ["zh": "AI 问询", "en": "Ask AI", "ja": "AIに質問"],
+        "chat.send": ["zh": "发送", "en": "Send", "ja": "送信"],
         "sidebar.search": ["zh": "搜索…", "en": "Search…", "ja": "検索…"],
         "chat.webSearch": ["zh": "联网搜索", "en": "Web Search", "ja": "Web検索"],
         "chat.webSearchHint": ["zh": "问询前检索相关资讯注入上下文（免费源）", "en": "Search news before answering (free sources)", "ja": "回答前にニュースを検索"],
