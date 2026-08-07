@@ -19,6 +19,7 @@ struct WatchlistView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
         .overlay {
             if app.store.watchlist.isEmpty {
                 VStack(spacing: 10) {
@@ -65,6 +66,7 @@ struct MarketsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
         .overlay {
             if app.activeMarkets.isEmpty {
                 Text("未启用任何市场\n请到设置中开启")

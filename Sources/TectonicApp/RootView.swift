@@ -33,6 +33,8 @@ struct RootView: View {
                 window.setFrame(frame, display: true, animate: true)
             }
         })
+        // 窗口内容区背景跟随主题
+        .background(Color(hex: app.theme.background) ?? Color.clear)
     }
 }
 

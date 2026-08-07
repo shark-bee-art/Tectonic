@@ -8,6 +8,11 @@ import Combine
 final class AppState: ObservableObject {
     let store: Store
     let settings: AppSettings
+
+    /// 当前主题（跟随 settings.themeID；切换后 tint/配色即时生效）
+    var theme: TectonicTheme {
+        TectonicThemeCatalog.theme(id: settings.themeID)
+    }
     let aiSettings: AISettings
 
     private var cancellables: Set<AnyCancellable> = []
@@ -21,15 +26,32 @@ final class AppState: ObservableObject {
     /// 右侧 AI 问询面板（nil = 关闭）
     @Published var chatPanel: ChatPanelContext?
 
-    enum SidebarItem: String, Hashable {
-        case watchlist = "自选"
-        case markets = "行情"
-        case newsFlash = "快讯"
-        case newsResearch = "研报"
-        case newsEarnings = "财报"
-        case newsCalendar = "日历"
-        case holdings = "持仓"
-        case transactions = "交易记录"
+    enum SidebarItem: Hashable {
+        case watchlist
+        case markets
+        case newsFlash
+        case newsResearch
+        case newsEarnings
+        case newsCalendar
+        /// 独立查看某个资讯源（sourceID = NewsFeed.id）
+        case newsFeed(sourceID: String)
+        case holdings
+        case transactions
+
+        /// 侧边栏显示名
+        var title: String {
+            switch self {
+            case .watchlist: "自选"
+            case .markets: "行情"
+            case .newsFlash: "快讯"
+            case .newsResearch: "研报"
+            case .newsEarnings: "财报"
+            case .newsCalendar: "日历"
+            case .newsFeed: "订阅源"
+            case .holdings: "持仓"
+            case .transactions: "交易记录"
+            }
+        }
     }
 
     init(db: AppDatabase) {

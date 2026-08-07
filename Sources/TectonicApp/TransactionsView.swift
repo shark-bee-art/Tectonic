@@ -43,6 +43,7 @@ struct TransactionsView: View {
                             }
                     }
                 }
+                .scrollContentBackground(.hidden)
                 .safeAreaInset(edge: .bottom) {
                     VStack(spacing: 8) {
                         if let tx = selected {

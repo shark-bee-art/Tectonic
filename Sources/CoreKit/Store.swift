@@ -385,8 +385,11 @@ public final class Store: ObservableObject {
     }
 
     /// 拉取某分类下所有启用源的资讯（分批并发，每批 3 个源，避免单一域名被反爬限流）
-    public func fetchNews(category: NewsFeedCategory) async -> [NewsItem] {
-        let feeds = newsFeeds.filter { $0.category == category && $0.enabled }
+    /// - Parameter sourceID: 非 nil 时只拉取该源（侧边栏「订阅源」子菜单独立查看）
+    public func fetchNews(category: NewsFeedCategory, sourceID: String? = nil) async -> [NewsItem] {
+        let feeds = newsFeeds.filter {
+            $0.category == category && $0.enabled && (sourceID == nil || $0.id == sourceID)
+        }
         guard !feeds.isEmpty else { return [] }
         var all: [NewsItem] = []
         let batchSize = 3

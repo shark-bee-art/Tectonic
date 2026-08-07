@@ -96,6 +96,7 @@ struct AddSymbolPopover: View {
                     }
                 }
                 .listStyle(.inset)
+                .scrollContentBackground(.hidden)
                 .frame(minHeight: 90, maxHeight: 260)
             } else {
                 Text("输入代码或名称开始搜索\n支持：AAPL、600519、00700.HK、BTCUSDT、110022、7203.T 等")

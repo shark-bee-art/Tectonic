@@ -2,14 +2,27 @@ import SwiftUI
 import CoreKit
 
 /// 资讯分类列表：快讯/研报/财报/日历 通用；日历按日期分组
+/// sourceID 非 nil 时只显示该订阅源（侧边栏子菜单独立查看）
 struct NewsListView: View {
     @EnvironmentObject var app: AppState
     let category: NewsFeedCategory
+    var sourceID: String? = nil
 
     @State private var items: [NewsItem] = []
     @State private var isLoading = false
     @State private var lastError: String?
     @State private var refreshTick = 0
+
+    /// 当前源（sourceID 非 nil 时）
+    private var sourceFeed: NewsFeed? {
+        guard let sourceID else { return nil }
+        return app.store.newsFeeds.first { $0.id == sourceID }
+    }
+
+    /// 标题：单源显示源名，否则显示分类名
+    private var titleText: String {
+        sourceFeed?.name ?? category.displayName
+    }
 
     /// 按日期分组（日历/财报用）
     private var grouped: [(Date, [NewsItem])] {
@@ -26,7 +39,7 @@ struct NewsListView: View {
         VStack(spacing: 0) {
             // 顶部工具条
             HStack {
-                Label(category.displayName, systemImage: category.icon)
+                Label(titleText, systemImage: category.icon)
                     .font(.headline)
                 Spacer()
                 if let last = items.first?.publishedAt {
@@ -64,6 +77,7 @@ struct NewsListView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
             .overlay {
                 if isLoading && items.isEmpty {
                     ProgressView("加载中…")
@@ -80,11 +94,15 @@ struct NewsListView: View {
                 }
             }
         }
-        .task(id: "\(category.rawValue)-\(refreshTick)") {
+        .task(id: "\(category.rawValue)-\(sourceID ?? "")-\(refreshTick)") {
             await load()
         }
         .onChange(of: category) { _, _ in
             app.selectedNews = nil
+        }
+        .onChange(of: sourceID) { _, _ in
+            app.selectedNews = nil
+            refreshTick += 1
         }
     }
 
@@ -99,12 +117,12 @@ struct NewsListView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        items = await app.store.fetchNews(category: category)
+        items = await app.store.fetchNews(category: category, sourceID: sourceID)
         lastError = nil
         // 订阅源未导入时先导入再拉一次
         if items.isEmpty, app.store.newsFeeds.isEmpty {
             try? app.store.importBuiltinFeedsIfNeeded()
-            items = await app.store.fetchNews(category: category)
+            items = await app.store.fetchNews(category: category, sourceID: sourceID)
         }
     }
 }

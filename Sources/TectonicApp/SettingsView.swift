@@ -34,6 +34,15 @@ struct GeneralSettingsTab: View {
 
     var body: some View {
         Form {
+            Section(L10n.l("settings.appearance")) {
+                ForEach(TectonicThemeCatalog.themes) { theme in
+                    themeRow(theme)
+                }
+                Text(L10n.l("settings.appearanceHint"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section(L10n.l("settings.language")) {
                 Picker(L10n.l("settings.language"), selection: Binding(
                     get: { app.settings.preferredLanguage },
@@ -67,6 +76,45 @@ struct GeneralSettingsTab: View {
         }
         .formStyle(.grouped)
         .padding(12)
+    }
+
+    /// 主题行（色块预览 + 名称/描述 + 选中圆点；点击即切换，即时生效）
+    private func themeRow(_ theme: TectonicTheme) -> some View {
+        let selected = app.settings.themeID == theme.id
+        return Button {
+            app.settings.themeID = theme.id
+        } label: {
+            HStack(spacing: 10) {
+                // 色块预览（accent / time / background / text）
+                HStack(spacing: 3) {
+                    Circle().fill(Color(hex: theme.accent) ?? .accentColor).frame(width: 10, height: 10)
+                    Circle().fill(Color(hex: theme.time) ?? .secondary).frame(width: 10, height: 10)
+                    Circle()
+                        .fill(Color(hex: theme.background) ?? .gray)
+                        .frame(width: 10, height: 10)
+                        .overlay(Circle().stroke(Color(hex: theme.border) ?? .gray.opacity(0.4), lineWidth: 1))
+                    Circle().fill(Color(hex: theme.text) ?? .primary).frame(width: 10, height: 10)
+                }
+                .frame(width: 52, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(L10n.l("theme.name." + theme.id))
+                        .foregroundStyle(.primary)
+                    Text(L10n.l("theme.desc." + theme.id))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+            }
+            .padding(.vertical, 3)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

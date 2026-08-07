@@ -57,17 +57,21 @@ public struct NewsFeed: Codable, Sendable, Identifiable, Hashable {
     }
 }
 
-// MARK: - 预置订阅源（全部为真实 RSS，来自 GitHub 主流合集验证）
+// MARK: - 预置订阅源（全部为真实 RSS，2026-08 实测：HTTP 200 + XML 解析通过 + 条目新鲜度 ≤25h）
 
 public enum NewsFeedCatalog {
     public static let all: [NewsFeed] = [
-        // 快讯（实时新闻）
+        // 快讯（实时财经新闻，更新 ≤12h）
         NewsFeed(name: "中新网·财经", category: .flash, kind: .rss,
                  url: "https://www.chinanews.com.cn/rss/finance.xml"),
-        NewsFeed(name: "日经中文网", category: .flash, kind: .rss,
-                 url: "https://cn.nikkei.com/rss.html"),
         NewsFeed(name: "钛媒体", category: .flash, kind: .rss,
                  url: "https://www.tmtpost.com/rss"),
+        NewsFeed(name: "华尔街日报中文 快讯", category: .flash, kind: .rss,
+                 url: "https://cn.wsj.com/zh-hans/rss"),
+        NewsFeed(name: "日经中文网", category: .flash, kind: .rss,
+                 url: "https://cn.nikkei.com/rss.html"),
+        NewsFeed(name: "BBC Business", category: .flash, kind: .rss,
+                 url: "https://feeds.bbci.co.uk/news/business/rss.xml"),
         NewsFeed(name: "CNBC Top News", category: .flash, kind: .rss,
                  url: "https://www.cnbc.com/id/100003114/device/rss/rss.html"),
         NewsFeed(name: "MarketWatch Top", category: .flash, kind: .rss,
@@ -76,23 +80,21 @@ public enum NewsFeedCatalog {
                  url: "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         NewsFeed(name: "CoinTelegraph", category: .flash, kind: .rss,
                  url: "https://cointelegraph.com/rss"),
-        NewsFeed(name: "The Block", category: .flash, kind: .rss,
-                 url: "https://www.theblock.co/rss.xml"),
-        NewsFeed(name: "Yahoo Finance 美股大盘", category: .flash, kind: .rss,
-                 url: "https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US"),
-        NewsFeed(name: "Yahoo Finance 科技龙头", category: .flash, kind: .rss,
-                 url: "https://feeds.finance.yahoo.com/rss/2.0/headline?s=AAPL,MSFT,NVDA,GOOGL,AMZN,TSLA&region=US&lang=en-US"),
-        // 研报（机构/深度分析）
-        NewsFeed(name: "Fortune", category: .research, kind: .rss,
-                 url: "https://fortune.com/feed"),
-        NewsFeed(name: "Forbes Business", category: .research, kind: .rss,
-                 url: "https://www.forbes.com/business/feed/"),
+        // 研报（机构深度分析）
+        NewsFeed(name: "McKinsey Insights", category: .research, kind: .rss,
+                 url: "https://www.mckinsey.com/insights/rss"),
+        NewsFeed(name: "MIT Technology Review", category: .research, kind: .rss,
+                 url: "https://www.technologyreview.com/feed"),
         NewsFeed(name: "Seeking Alpha", category: .research, kind: .rss,
                  url: "https://seekingalpha.com/market_currents.xml"),
-        // 财报（公司财报新闻）
+        NewsFeed(name: "Forbes Business", category: .research, kind: .rss,
+                 url: "https://www.forbes.com/business/feed/"),
+        NewsFeed(name: "Fortune", category: .research, kind: .rss,
+                 url: "https://fortune.com/feed"),
+        // 财报（季度财报新闻）
         NewsFeed(name: "CNBC Earnings", category: .earnings, kind: .rss,
                  url: "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
-        // 日历（宏观/经济数据新闻）
+        // 日历（宏观/经济数据新闻；日历页主源为 Investing 经济日历 API）
         NewsFeed(name: "CNBC Economy", category: .calendar, kind: .rss,
                  url: "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
     ]

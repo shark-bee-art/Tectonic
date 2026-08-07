@@ -25,6 +25,9 @@ struct ContentView: View {
                 NewsListView(category: .earnings)
             case .newsCalendar:
                 CalendarView()
+            case .newsFeed(let id):
+                // 独立查看某个订阅源（category 取该源所属分类）
+                NewsListView(category: app.store.newsFeeds.first { $0.id == id }?.category ?? .flash, sourceID: id)
             case .holdings:
                 HoldingsView()
             case .transactions:
@@ -39,7 +42,7 @@ struct ContentView: View {
                 } else {
                     PlaceholderView()
                 }
-            case .newsFlash, .newsResearch, .newsEarnings, .newsCalendar:
+            case .newsFlash, .newsResearch, .newsEarnings, .newsCalendar, .newsFeed:
                 if let item = app.selectedNews {
                     NewsDetailView(item: item)
                         .id(item.id)
@@ -68,6 +71,10 @@ struct ContentView: View {
                 AddSymbolButton()
             }
         }
+        // 标题栏/工具栏区域跟随主题
+        .toolbarBackground(Color(hex: app.theme.background) ?? Color.clear, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
+        .background(Color(hex: app.theme.background) ?? Color.clear)
         .onAppear {
             app.onAppear()
         }
@@ -88,14 +95,46 @@ struct SidebarView: View {
                     .tag(AppState.SidebarItem.markets)
             }
             Section(L10n.l("sidebar.news")) {
-                Label(L10n.l("sidebar.flash"), systemImage: "bolt.fill")
-                    .tag(AppState.SidebarItem.newsFlash)
-                Label(L10n.l("sidebar.research"), systemImage: "doc.text.magnifyingglass")
-                    .tag(AppState.SidebarItem.newsResearch)
-                Label(L10n.l("sidebar.earnings"), systemImage: "chart.bar.doc.horizontal")
-                    .tag(AppState.SidebarItem.newsEarnings)
-                Label(L10n.l("sidebar.calendar"), systemImage: "calendar")
-                    .tag(AppState.SidebarItem.newsCalendar)
+                DisclosureGroup {
+                    // 全部快讯（查看该分类全部源）
+                    Label(L10n.l("sidebar.all") + L10n.l("sidebar.flash"), systemImage: "square.grid.2x2")
+                        .tag(AppState.SidebarItem.newsFlash)
+                    ForEach(feeds(for: .flash)) { feed in
+                        sourceRow(feed)
+                    }
+                } label: {
+                    Label(L10n.l("sidebar.flash"), systemImage: "bolt.fill")
+                }
+
+                DisclosureGroup {
+                    Label(L10n.l("sidebar.all") + L10n.l("sidebar.research"), systemImage: "square.grid.2x2")
+                        .tag(AppState.SidebarItem.newsResearch)
+                    ForEach(feeds(for: .research)) { feed in
+                        sourceRow(feed)
+                    }
+                } label: {
+                    Label(L10n.l("sidebar.research"), systemImage: "doc.text.magnifyingglass")
+                }
+
+                DisclosureGroup {
+                    Label(L10n.l("sidebar.all") + L10n.l("sidebar.earnings"), systemImage: "square.grid.2x2")
+                        .tag(AppState.SidebarItem.newsEarnings)
+                    ForEach(feeds(for: .earnings)) { feed in
+                        sourceRow(feed)
+                    }
+                } label: {
+                    Label(L10n.l("sidebar.earnings"), systemImage: "chart.bar.doc.horizontal")
+                }
+
+                DisclosureGroup {
+                    Label(L10n.l("sidebar.all") + L10n.l("sidebar.calendar"), systemImage: "square.grid.2x2")
+                        .tag(AppState.SidebarItem.newsCalendar)
+                    ForEach(feeds(for: .calendar)) { feed in
+                        sourceRow(feed)
+                    }
+                } label: {
+                    Label(L10n.l("sidebar.calendar"), systemImage: "calendar")
+                }
             }
             Section(L10n.l("sidebar.assets")) {
                 Label(L10n.l("sidebar.holdings"), systemImage: "briefcase")
@@ -105,6 +144,20 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(Color(hex: app.theme.sidebar) ?? Color.clear)
+    }
+
+    /// 某分类下启用的订阅源
+    private func feeds(for category: NewsFeedCategory) -> [NewsFeed] {
+        app.store.newsFeeds.filter { $0.category == category && $0.enabled }
+    }
+
+    /// 订阅源行（点击 = 独立查看该源）
+    private func sourceRow(_ feed: NewsFeed) -> some View {
+        Label(feed.name, systemImage: "dot.radiowaves.left.and.right")
+            .lineLimit(1)
+            .tag(AppState.SidebarItem.newsFeed(sourceID: feed.id))
     }
 }
 

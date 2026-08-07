@@ -72,6 +72,10 @@ public final class AppSettings: ObservableObject {
     @Published public var searchAPIKey: String {
         didSet { save() }
     }
+    /// 界面主题 ID（TectonicThemeCatalog.themes，20 种预置）
+    @Published public var themeID: String {
+        didSet { save() }
+    }
 
     public init(defaults: UserDefaults = .standard) {
         let d = defaults
@@ -92,6 +96,7 @@ public final class AppSettings: ObservableObject {
         refreshIntervalMinutes = d.object(forKey: "refresh_interval_minutes") as? Int ?? 5
         searchProvider = SearchProvider(rawValue: d.string(forKey: "search_provider") ?? "") ?? .brave
         searchAPIKey = d.string(forKey: "search_api_key") ?? ""
+        themeID = d.string(forKey: "theme_id") ?? TectonicThemeCatalog.defaultID
     }
 
     /// AI 回复语言指令（跟随全局界面语言）
@@ -153,6 +158,7 @@ public final class AppSettings: ObservableObject {
         d.set(refreshIntervalMinutes, forKey: "refresh_interval_minutes")
         d.set(searchProvider.rawValue, forKey: "search_provider")
         d.set(searchAPIKey, forKey: "search_api_key")
+        d.set(themeID, forKey: "theme_id")
     }
 }
 
