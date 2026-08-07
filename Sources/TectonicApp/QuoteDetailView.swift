@@ -384,7 +384,7 @@ struct QuoteDetailView: View {
             // 对话框：输入框 + 快速问题
             VStack(spacing: DS.space3) {
                 HStack(spacing: 8) {
-                    TextField(L10n.l("placeholder.detail"), text: $chatInput)
+                    TextField(L10n.l("chat.askHint"), text: $chatInput)
                         .textFieldStyle(.plain)
                         .font(.system(size: 14))
                         .onSubmit { sendChat() }
