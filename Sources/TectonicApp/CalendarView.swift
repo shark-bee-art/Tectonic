@@ -1,4 +1,5 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 
 /// 宏观经济日历：各国统计局发布数据（CPI / GDP / PMI 等），按天分组

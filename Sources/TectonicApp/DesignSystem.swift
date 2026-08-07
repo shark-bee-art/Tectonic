@@ -1,4 +1,5 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 
 // MARK: - Tectonic 设计系统 v3（Robinhood 视觉语言）

@@ -41,9 +41,13 @@ let package = Package(
             dependencies: ["CoreKit"],
             path: "Sources/tectonic-cli"
         ),
+        .target(
+            name: "TectonicIcons",
+            path: "Sources/TectonicIcons"
+        ),
         .executableTarget(
             name: "TectonicApp",
-            dependencies: ["CoreKit"],
+            dependencies: ["CoreKit", "TectonicIcons"],
             path: "Sources/TectonicApp",
             resources: [
                 .process("Resources/Fonts")

@@ -1,4 +1,5 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 
 /// 标的详情：Robinhood 风格——Hero 大数字 + 技术面/基本面卡片 + AI 问询

@@ -224,6 +224,7 @@ public enum L10n {
         "cmd.nav": ["zh": "导航", "en": "Navigate", "ja": "移動"],
         "cmd.refresh": ["zh": "刷新行情", "en": "Refresh Quotes", "ja": "相場を更新"],
         "cmd.add": ["zh": "添加标的", "en": "Add Symbol", "ja": "銘柄を追加"],
+        "cmd.useSearch": ["zh": "使用顶部搜索栏", "en": "Use the top search bar", "ja": "上部の検索バーを使用"],
         "nav.back": ["zh": "返回", "en": "Back", "ja": "戻る"],
         // 持仓
         // 交易记录

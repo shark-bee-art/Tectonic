@@ -1,8 +1,9 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 
-/// 主界面：单栏 + 导航栈（Robinhood 结构，无三栏）
-/// 顶部 tab 栏（自选/行情/快讯/研报/财报/日历）→ 全宽列表 → 点击 push 全宽详情页（带返回）
+/// 主界面：单栏 + 导航栈
+/// 顶部（应用图标 + 四 tab + 搜索） → 全宽列表 → 点击 push 全宽详情页（带返回）
 struct ContentView: View {
     @EnvironmentObject var app: AppState
 
@@ -48,10 +49,7 @@ struct ContentView: View {
     }
 
     private var isNewsTab: Bool {
-        switch app.selectedTab {
-        case .newsFlash, .newsResearch, .newsEarnings, .newsCalendar, .newsFeed: true
-        default: false
-        }
+        app.selectedTab.isNewsTab
     }
 
     // MARK: 当前 tab 内容（全宽列表）
@@ -63,143 +61,16 @@ struct ContentView: View {
             WatchlistView()
         case .markets:
             MarketsView()
-        case .newsFlash:
-            NewsListView(category: .flash)
-        case .newsResearch:
-            NewsListView(category: .research)
-        case .newsEarnings:
-            NewsListView(category: .earnings)
-        case .newsCalendar:
-            CalendarView()
+        case .news:
+            // 新闻聚合：快讯 + 研报 + 财报
+            NewsListView(category: nil)
+        case .newsCategory(let category):
+            NewsListView(category: category)
         case .newsFeed(let id):
-            NewsListView(category: app.store.newsFeeds.first { $0.id == id }?.category ?? .flash, sourceID: id)
-        }
-    }
-}
-
-// MARK: - 顶部 tab 栏（Robinhood 底部 tab 的桌面化：顶部分段 tab）
-
-struct TopTabBar: View {
-    @EnvironmentObject var app: AppState
-    /// 展开中的资讯分类（nil = 收起来源子菜单）
-    @State private var expandedCategory: NewsFeedCategory?
-
-    var body: some View {
-        HStack(spacing: 4) {
-            // 主 tab
-            tabButton(icon: .star, title: L10n.l("sidebar.watchlist"),
-                      selected: app.selectedTab == .watchlist) {
-                select(.watchlist)
-            }
-            tabButton(icon: .chartLine, title: L10n.l("sidebar.markets"),
-                      selected: app.selectedTab == .markets) {
-                select(.markets)
-            }
-
-            // 资讯分类 tab（带来源子菜单）
-            ForEach(NewsFeedCategory.allCases) { category in
-                let expanded = expandedCategory == category
-                Menu {
-                    // 全部
-                    Button {
-                        select(allItem(for: category))
-                    } label: {
-                        Label(L10n.l("sidebar.all") + category.displayName,
-                              systemImage: "square.grid.2x2")
-                    }
-                    if !feeds(for: category).isEmpty {
-                        Divider()
-                        ForEach(feeds(for: category)) { feed in
-                            Button {
-                                select(.newsFeed(sourceID: feed.id))
-                            } label: {
-                                Label(feed.name, systemImage: "dot.radiowaves.left.and.right")
-                            }
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 5) {
-                        TectonicIconView(icon: categoryIcon(category), size: 14,
-                                         color: isCategoryActive(category) ? DS.textPrimary : DS.textSecondary)
-                        Text(category.displayName)
-                            .font(.system(size: 13, weight: isCategoryActive(category) ? .semibold : .regular))
-                            .foregroundStyle(isCategoryActive(category) ? DS.textPrimary : DS.textSecondary)
-                        TectonicIconView(icon: .chevronDown, size: 10, color: DS.textTertiary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: DS.radiusCard)
-                            .fill(isCategoryActive(category) ? DS.bgSelected : .clear)
-                    )
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-            }
-            Spacer()
-        }
-        .padding(.horizontal, DS.space4)
-        .padding(.vertical, 6)
-        .background(DS.bgApp)
-    }
-
-    private func tabButton(icon: TectonicIcon, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                TectonicIconView(icon: icon, size: 14, color: selected ? DS.textPrimary : DS.textSecondary)
-                Text(title)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: DS.radiusCard)
-                    .fill(selected ? DS.bgSelected : .clear)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func select(_ item: AppState.SidebarItem) {
-        app.selectedTab = item
-        app.selectedSymbol = nil
-        app.selectedNews = nil
-    }
-
-    private func feeds(for category: NewsFeedCategory) -> [NewsFeed] {
-        app.store.newsFeeds.filter { $0.category == category && $0.enabled }
-    }
-
-    private func allItem(for category: NewsFeedCategory) -> AppState.SidebarItem {
-        switch category {
-        case .flash: .newsFlash
-        case .research: .newsResearch
-        case .earnings: .newsEarnings
-        case .calendar: .newsCalendar
-        }
-    }
-
-    private func isCategoryActive(_ category: NewsFeedCategory) -> Bool {
-        switch category {
-        case .flash: app.selectedTab == .newsFlash || matchesFeed(.flash)
-        case .research: app.selectedTab == .newsResearch || matchesFeed(.research)
-        case .earnings: app.selectedTab == .newsEarnings || matchesFeed(.earnings)
-        case .calendar: app.selectedTab == .newsCalendar || matchesFeed(.calendar)
-        }
-    }
-
-    private func matchesFeed(_ c: NewsFeedCategory) -> Bool {
-        guard case .newsFeed(let id) = app.selectedTab else { return false }
-        return app.store.newsFeeds.first { $0.id == id }?.category == c
-    }
-
-    private func categoryIcon(_ category: NewsFeedCategory) -> TectonicIcon {
-        switch category {
-        case .flash: .bolt
-        case .research: .fileText
-        case .earnings: .chartBar
-        case .calendar: .calendar
+            NewsListView(category: app.store.newsFeeds.first { $0.id == id }?.category,
+                         sourceID: id)
+        case .calendar:
+            CalendarView()
         }
     }
 }

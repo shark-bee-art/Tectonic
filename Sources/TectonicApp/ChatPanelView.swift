@@ -1,7 +1,8 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 
-/// 右侧滑出式 AI 问询面板（主流聊天 UI：轻盈毛玻璃 + 头像气泡 + 底部输入区）
+/// 底部悬浮 AI 问询对话框（主流聊天 UI：头像气泡 + 底部输入区）
 struct ChatPanelContext: Identifiable {
     let id = UUID()
     let title: String
@@ -28,19 +29,24 @@ struct ChatPanelView: View {
             .animation(.easeInOut(duration: 0.22), value: app.chatPanel?.id)
     }
 
-    // MARK: 面板主体
+    // MARK: 面板主体（底部悬浮，固定高度可滚动）
 
     private var panel: some View {
         VStack(spacing: 0) {
             header
-            Divider()
+            DSDivider()
             messagesList
-            Divider()
+            DSDivider()
             inputArea
         }
-        .frame(width: 430)
-        .frame(maxHeight: .infinity)
-        .background(.regularMaterial)
+        .frame(width: 560, height: 400)
+        .background(DS.bgPanel)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(DS.border, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.15), radius: 16, y: 4)
     }
 
     private var header: some View {

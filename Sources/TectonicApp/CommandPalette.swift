@@ -1,4 +1,5 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 
 // MARK: - ⌘K 命令面板（TradingView 淡雅：输入即搜，上下键选择，回车执行）
@@ -159,9 +160,8 @@ struct CommandPaletteView: View {
             })
         }
         if match(L10n.l("cmd.add")) || q == "add" {
-            items.append(CommandItem(title: L10n.l("cmd.add"), subtitle: "⌘N", icon: .plus) {
-                // 打开添加面板：通过 AppState 通知 ContentView
-                app.openAddSymbol = true
+            items.append(CommandItem(title: L10n.l("cmd.add"), subtitle: L10n.l("cmd.useSearch"), icon: .search) {
+                app.searchText = ""
             })
         }
 
@@ -170,10 +170,8 @@ struct CommandPaletteView: View {
 
     private func allItem(for category: NewsFeedCategory) -> AppState.SidebarItem {
         switch category {
-        case .flash: .newsFlash
-        case .research: .newsResearch
-        case .earnings: .newsEarnings
-        case .calendar: .newsCalendar
+        case .flash, .research, .earnings: .newsCategory(category)
+        case .calendar: .calendar
         }
     }
 }

@@ -1,17 +1,22 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 
-/// 资讯分类列表：快讯/研报/财报/日历 通用；日历按日期分组
+/// 资讯列表：快讯/研报/财报/聚合 通用
+/// category = nil → 聚合模式（快讯+研报+财报 合并，顶部子分类切换条）
 /// Robinhood News Card：12pt 圆角卡片 + 标题 + 来源/时间 + hover 反馈
 struct NewsListView: View {
     @EnvironmentObject var app: AppState
-    let category: NewsFeedCategory
+    /// nil = 聚合（新闻 tab）；非 nil = 单分类
+    let category: NewsFeedCategory?
     var sourceID: String? = nil
 
     @State private var items: [NewsItem] = []
     @State private var isLoading = false
     @State private var lastError: String?
     @State private var refreshTick = 0
+    /// 聚合模式下选中的子分类（nil = 全部）
+    @State private var subCategory: NewsFeedCategory? = nil
 
     private var sourceFeed: NewsFeed? {
         guard let sourceID else { return nil }
@@ -19,21 +24,29 @@ struct NewsListView: View {
     }
 
     private var titleText: String {
-        sourceFeed?.name ?? category.displayName
+        sourceFeed?.name ?? category?.displayName ?? L10n.l("sidebar.news")
     }
 
-    /// 搜索结果（顶部搜索框过滤标题/摘要）
+    /// 搜索结果（顶部搜索框过滤标题/摘要；聚合模式下子分类过滤）
     private var filteredItems: [NewsItem] {
+        var list = items
+        // 聚合模式下子分类过滤：匹配该分类下订阅源的来源名
+        if let sub = subCategory {
+            let sourceNames = Set(app.store.newsFeeds
+                .filter { $0.category == sub && $0.enabled }
+                .map { $0.name })
+            list = list.filter { sourceNames.contains($0.source) }
+        }
         let q = app.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return items }
-        return items.filter {
+        guard !q.isEmpty else { return list }
+        return list.filter {
             $0.title.localizedCaseInsensitiveContains(q)
                 || $0.summary.localizedCaseInsensitiveContains(q)
                 || $0.source.localizedCaseInsensitiveContains(q)
         }
     }
 
-    /// 按日期分组（日历/财报用）
+    /// 按日期分组（日历用；聚合/财报平铺）
     private var grouped: [(Date, [NewsItem])] {
         let cal = Calendar.current
         var buckets: [Date: [NewsItem]] = [:]
@@ -44,16 +57,26 @@ struct NewsListView: View {
         return buckets.keys.sorted(by: >).map { ($0, buckets[$0]!.sorted { $0.publishedAt > $1.publishedAt }) }
     }
 
+    /// 聚合模式下可切换的子分类（快讯/研报/财报）
+    private var subCategories: [NewsFeedCategory] {
+        [.flash, .research, .earnings]
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            if category == .calendar || category == .earnings {
+            // 聚合模式：子分类切换条
+            if category == nil, sourceID == nil {
+                subCategoryBar
+            }
+
+            if category == .calendar {
                 groupedList
             } else {
                 plainList
             }
         }
         .background(DS.bgApp)
-        .task(id: "\(category.rawValue)-\(sourceID ?? "")-\(refreshTick)") {
+        .task(id: "\(category?.rawValue ?? "all")-\(sourceID ?? "")-\(refreshTick)") {
             await load()
         }
         .onChange(of: category) { _, _ in
@@ -63,6 +86,39 @@ struct NewsListView: View {
             app.selectedNews = nil
             refreshTick += 1
         }
+    }
+
+    // MARK: 子分类切换条
+
+    private var subCategoryBar: some View {
+        HStack(spacing: 6) {
+            subTab(title: L10n.l("sidebar.all") + L10n.l("sidebar.news"), selected: subCategory == nil) {
+                subCategory = nil
+            }
+            ForEach(subCategories, id: \.self) { cat in
+                subTab(title: cat.displayName, selected: subCategory == cat) {
+                    subCategory = cat
+                }
+            }
+            Spacer()
+        }
+        .padding(.horizontal, DS.space4)
+        .padding(.vertical, 6)
+    }
+
+    private func subTab(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12.5, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: DS.radiusMedium)
+                        .fill(selected ? DS.bgSelected : .clear)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 列表（按日期分组）
@@ -145,15 +201,27 @@ struct NewsListView: View {
     private func load() async {
         isLoading = true
         defer { isLoading = false }
-        items = await app.store.fetchNews(category: category, sourceID: sourceID)
+        if let category {
+            items = await app.store.fetchNews(category: category, sourceID: sourceID)
+        } else {
+            // 聚合：拉取三个子分类合并，按时间排序
+            let cats: [NewsFeedCategory] = [.flash, .research, .earnings]
+            var all: [NewsItem] = []
+            for cat in cats {
+                let part = await app.store.fetchNews(category: cat, sourceID: sourceID)
+                all.append(contentsOf: part)
+            }
+            items = all.sorted { $0.publishedAt > $1.publishedAt }
+        }
         lastError = nil
         if items.isEmpty, app.store.newsFeeds.isEmpty {
             try? app.store.importBuiltinFeedsIfNeeded()
-            items = await app.store.fetchNews(category: category, sourceID: sourceID)
+            if let category {
+                items = await app.store.fetchNews(category: category, sourceID: sourceID)
+            }
         }
     }
 }
-
 // MARK: - 新闻卡片（RH News Card：12pt 圆角 + 1pt 边框 + 标题/来源/时间）
 
 struct NewsCard: View {

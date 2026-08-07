@@ -29,29 +29,34 @@ final class AppState: ObservableObject {
     @Published var searchText = ""
     /// ⌘K 命令面板可见性
     @Published var showCommandPalette = false
-    /// 「添加标的」面板请求（命令面板触发）
-    @Published var openAddSymbol = false
 
     enum SidebarItem: Hashable {
         case watchlist
         case markets
-        case newsFlash
-        case newsResearch
-        case newsEarnings
-        case newsCalendar
+        case news
+        case calendar
+        /// 新闻 tab 内的子分类（快讯/研报/财报）
+        case newsCategory(NewsFeedCategory)
         /// 独立查看某个资讯源（sourceID = NewsFeed.id）
         case newsFeed(sourceID: String)
 
-        /// 侧边栏显示名
+        /// 顶部显示名
         var title: String {
             switch self {
             case .watchlist: "自选"
-            case .markets: "行情"
-            case .newsFlash: "快讯"
-            case .newsResearch: "研报"
-            case .newsEarnings: "财报"
-            case .newsCalendar: "日历"
+            case .markets: "市场"
+            case .news: "新闻"
+            case .calendar: "日历"
+            case .newsCategory: "新闻"
             case .newsFeed: "订阅源"
+            }
+        }
+
+        /// 是否属于新闻 tab（用于顶部 tab 高亮）
+        var isNewsTab: Bool {
+            switch self {
+            case .news, .newsCategory, .newsFeed: true
+            default: false
             }
         }
     }

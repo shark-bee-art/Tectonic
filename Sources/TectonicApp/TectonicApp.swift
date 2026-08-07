@@ -39,7 +39,7 @@ struct TectonicApp: App {
             SettingsView()
                 .environmentObject(appState)
                 .environmentObject(appState.aiSettings)
-                .frame(width: 640, height: 620)
+                .frame(width: 760, height: 620)
                 // 设置窗口同样跟随主题
                 .tint(DS.accent)
                 .preferredColorScheme(appState.theme.isDark ? .dark : .light)

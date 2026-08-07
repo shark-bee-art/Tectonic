@@ -1,29 +1,71 @@
 import SwiftUI
+import TectonicIcons
 import CoreKit
 import UniformTypeIdentifiers
 
-/// 设置：通用（市场）+ AI（供应商/模型/Key）
-/// 遵循用户偏好：分类标题无选择控件、语言/模型用下拉、API Key 仅本地存储
+/// 设置：通用 + 市场 + AI + 资讯源
+/// 自绘侧边栏导航（左侧图标列表 + 右侧内容），弃系统 TabView（自定义图标渲染 + 非苹果风格）
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
-    @State private var selectedTab = "market"
+    @State private var selectedTab = "general"
+
+    private let tabs: [(id: String, icon: TectonicIcon, title: String)] = [
+        ("general", .settings, L10n.l("settings.generalTab")),
+        ("market", .chartBar, L10n.l("settings.marketTab")),
+        ("ai", .sparkles, L10n.l("settings.aiTab")),
+        ("news", .news, L10n.l("settings.newsTab")),
+    ]
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            GeneralSettingsTab()
-                .tabItem { Label { Text(L10n.l("settings.generalTab")) } icon: { TectonicIconView(icon: .settings, size: 14, color: DS.textSecondary) } }
-                .tag("general")
-            MarketSettingsTab()
-                .tabItem { Label { Text(L10n.l("settings.marketTab")) } icon: { TectonicIconView(icon: .chartBar, size: 14, color: DS.textSecondary) } }
-                .tag("market")
-            AISettingsTab()
-                .tabItem { Label { Text(L10n.l("settings.aiTab")) } icon: { TectonicIconView(icon: .sparkles, size: 14, color: DS.textSecondary) } }
-                .tag("ai")
-            NewsSettingsTab()
-                .tabItem { Label { Text(L10n.l("settings.newsTab")) } icon: { TectonicIconView(icon: .news, size: 14, color: DS.textSecondary) } }
-                .tag("news")
+        HStack(spacing: 0) {
+            // 左侧导航
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(tabs, id: \.id) { tab in
+                    settingsNavRow(icon: tab.icon, title: tab.title, selected: selectedTab == tab.id) {
+                        selectedTab = tab.id
+                    }
+                }
+                Spacer()
+            }
+            .padding(12)
+            .frame(width: 180)
+            .background(DS.bgSurface)
+
+            DSDivider()
+
+            // 右侧内容
+            Group {
+                switch selectedTab {
+                case "general": GeneralSettingsTab()
+                case "market": MarketSettingsTab()
+                case "ai": AISettingsTab()
+                default: NewsSettingsTab()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .padding(20)
+        .background(DS.bgPanel)
+    }
+
+    private func settingsNavRow(icon: TectonicIcon, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                TectonicIconView(icon: icon, size: 16,
+                                 color: selected ? DS.textPrimary : DS.textSecondary)
+                Text(title)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: DS.radiusMedium)
+                    .fill(selected ? DS.bgSelected : .clear)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
