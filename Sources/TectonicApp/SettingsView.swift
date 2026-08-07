@@ -18,17 +18,16 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶部横向 tab
-            HStack(spacing: 6) {
+            // 顶部横向 tab（居中排列，间距大，字体大）
+            HStack(spacing: 28) {
                 ForEach(tabs, id: \.id) { tab in
                     settingsNavRow(icon: tab.icon, title: tab.title, selected: selectedTab == tab.id) {
                         selectedTab = tab.id
                     }
                 }
-                Spacer()
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity)  // 居中
+            .padding(.vertical, 12)
             .background(DS.bgSurface)
 
             DSDivider()
@@ -49,15 +48,15 @@ struct SettingsView: View {
 
     private func settingsNavRow(icon: TectonicIcon, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                TectonicIconView(icon: icon, size: 16,
+            HStack(spacing: 10) {
+                TectonicIconView(icon: icon, size: 18,
                                  color: selected ? DS.textPrimary : DS.textSecondary)
                 Text(title)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 16, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
             .contentShape(Rectangle())
             .background(
                 RoundedRectangle(cornerRadius: DS.radiusMedium)

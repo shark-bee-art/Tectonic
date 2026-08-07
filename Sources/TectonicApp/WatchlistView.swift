@@ -25,6 +25,7 @@ struct WatchlistView: View {
                             PositionRow(name: item.symbol.name,
                                         ticker: "\(item.symbol.code) · \(item.symbol.market.displayName)",
                                         icon: marketIcon(item.symbol.market),
+                                        brandCode: item.symbol.code,
                                         value: quotePrice(item.symbol),
                                         change: quoteChange(item.symbol),
                                         isSelected: app.selectedSymbol?.id == item.symbol.id) {
@@ -114,6 +115,7 @@ struct MarketsView: View {
                                 PositionRow(name: symbol.name,
                                             ticker: "\(symbol.code) · \(symbol.market.displayName)",
                                             icon: marketIcon(symbol.market),
+                                            brandCode: symbol.code,
                                             value: quotePrice(symbol),
                                             change: quoteChange(symbol),
                                             isSelected: app.selectedSymbol?.id == symbol.id) {

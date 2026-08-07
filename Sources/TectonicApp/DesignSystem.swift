@@ -142,6 +142,7 @@ struct PositionRow: View {
     let name: String
     let ticker: String          // 代码（tracking +0.3）
     let icon: TectonicIcon      // 左侧 32×32 图标
+    var brandCode: String? = nil // 品牌 logo 代码（非 nil 时用品牌图标替代通用图标）
     let value: String?          // 右侧价值（tabular）
     let change: Double?         // 涨跌（绑定方向色）
     let isSelected: Bool
@@ -151,14 +152,18 @@ struct PositionRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: DS.space3) {
-                // 左侧 32×32 圆角徽章（RH logo/ticker badge）
-                RoundedRectangle(cornerRadius: DS.radiusMedium)
-                    .fill(iconBadgeColor)
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        TectonicIconView(icon: icon, size: 16,
-                                         color: iconBadgeColor.isLight ? .black : .white)
-                    )
+                // 左侧 32×32 徽章：品牌 logo（有则用）或通用图标
+                if let brandCode {
+                    BrandLogoView(code: brandCode, size: 32)
+                } else {
+                    RoundedRectangle(cornerRadius: DS.radiusMedium)
+                        .fill(iconBadgeColor)
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            TectonicIconView(icon: icon, size: 16,
+                                             color: iconBadgeColor.isLight ? .black : .white)
+                        )
+                }
 
                 // 中间：名称 + 代码
                 VStack(alignment: .leading, spacing: 1) {
