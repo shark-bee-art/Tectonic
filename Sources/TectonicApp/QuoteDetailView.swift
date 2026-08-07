@@ -384,7 +384,6 @@ struct QuoteDetailView: View {
             // 对话框：输入框 + 快速问题
             VStack(spacing: DS.space3) {
                 HStack(spacing: 8) {
-                    TectonicIconView(icon: .sparkles, size: 15, color: DS.up)
                     TextField(L10n.l("placeholder.detail"), text: $chatInput)
                         .textFieldStyle(.plain)
                         .font(.system(size: 14))
@@ -447,18 +446,7 @@ struct QuoteDetailView: View {
         .padding(.top, 6)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity)
-        // 底部渐变遮罩：内容从下方滑过时柔化（轻盈过渡，不硬切）
-        .background(
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: DS.bgApp.opacity(0.55), location: 0.4),
-                    .init(color: DS.bgApp.opacity(0.95), location: 0.75),
-                    .init(color: DS.bgApp, location: 1),
-                ],
-                startPoint: .top, endPoint: .bottom
-            )
-        )
+        // 纯玻璃悬浮：无底色衬底，内容从下方滑过时透过毛玻璃隐约可见（轻盈）
     }
 
     @State private var chatInput = ""
