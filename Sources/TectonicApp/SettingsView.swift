@@ -4,7 +4,7 @@ import CoreKit
 import UniformTypeIdentifiers
 
 /// 设置：通用 + 市场 + AI + 资讯源
-/// 自绘侧边栏导航（左侧图标列表 + 右侧内容），弃系统 TabView（自定义图标渲染 + 非苹果风格）
+/// 自绘顶部横向 tab（图标 + 文字横排，弃系统 TabView 保证自定义图标渲染）
 struct SettingsView: View {
     @EnvironmentObject var app: AppState
     @State private var selectedTab = "general"
@@ -17,9 +17,9 @@ struct SettingsView: View {
     ]
 
     var body: some View {
-        HStack(spacing: 0) {
-            // 左侧导航
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: 0) {
+            // 顶部横向 tab
+            HStack(spacing: 6) {
                 ForEach(tabs, id: \.id) { tab in
                     settingsNavRow(icon: tab.icon, title: tab.title, selected: selectedTab == tab.id) {
                         selectedTab = tab.id
@@ -27,13 +27,13 @@ struct SettingsView: View {
                 }
                 Spacer()
             }
-            .padding(12)
-            .frame(width: 180)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
             .background(DS.bgSurface)
 
             DSDivider()
 
-            // 右侧内容
+            // 内容区
             Group {
                 switch selectedTab {
                 case "general": GeneralSettingsTab()
@@ -49,15 +49,14 @@ struct SettingsView: View {
 
     private func settingsNavRow(icon: TectonicIcon, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 TectonicIconView(icon: icon, size: 16,
                                  color: selected ? DS.textPrimary : DS.textSecondary)
                 Text(title)
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
-                Spacer()
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .contentShape(Rectangle())
             .background(

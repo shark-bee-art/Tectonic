@@ -39,7 +39,7 @@ struct ChatPanelView: View {
             DSDivider()
             inputArea
         }
-        .frame(width: 560, height: 400)
+        .frame(width: 500, height: 340)
         .background(DS.bgPanel)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(

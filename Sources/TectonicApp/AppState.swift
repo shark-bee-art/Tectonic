@@ -33,10 +33,8 @@ final class AppState: ObservableObject {
     enum SidebarItem: Hashable {
         case watchlist
         case markets
-        case news
+        case flash
         case calendar
-        /// 新闻 tab 内的子分类（快讯/研报/财报）
-        case newsCategory(NewsFeedCategory)
         /// 独立查看某个资讯源（sourceID = NewsFeed.id）
         case newsFeed(sourceID: String)
 
@@ -44,18 +42,17 @@ final class AppState: ObservableObject {
         var title: String {
             switch self {
             case .watchlist: "自选"
-            case .markets: "市场"
-            case .news: "新闻"
+            case .markets: "行情"
+            case .flash: "快讯"
             case .calendar: "日历"
-            case .newsCategory: "新闻"
             case .newsFeed: "订阅源"
             }
         }
 
-        /// 是否属于新闻 tab（用于顶部 tab 高亮）
+        /// 是否属于快讯 tab（用于顶部 tab 高亮）
         var isNewsTab: Bool {
             switch self {
-            case .news, .newsCategory, .newsFeed: true
+            case .flash, .newsFeed: true
             default: false
             }
         }

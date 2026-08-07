@@ -263,8 +263,11 @@ public final class Store: ObservableObject {
     }
 
     /// 启动时导入/补全预置订阅源（幂等：每次检查缺失项自动补全，保证新增预置源生效）
+    /// 同时清理已移除分类的旧订阅源（研报/财报）
     @discardableResult
     public func importBuiltinFeedsIfNeeded() throws -> Int {
+        // 清理已移除分类（旧 DB 残留）
+        try cleanupRemovedFeedCategories()
         let d = UserDefaults.standard
         if d.bool(forKey: NewsFeedCatalog.importedFlagKey) {
             // 老用户：仍检查补全（新预置源自动加入）
@@ -273,6 +276,19 @@ public final class Store: ObservableObject {
         let added = try importMissingBuiltinFeeds()
         d.set(true, forKey: NewsFeedCatalog.importedFlagKey)
         return added
+    }
+
+    /// 删除已移除分类的订阅源（研报/财报）
+    private func cleanupRemovedFeedCategories() throws {
+        let removed = NewsFeedCatalog.removedCategoryRawValues
+        try db.dbQueue.write { db in
+            let cats = try NewsFeedRecord.fetchAll(db).map(\.category)
+            for raw in cats where removed.contains(raw) {
+                try NewsFeedRecord.filter(Column("category") == raw).deleteAll(db)
+                break  // 删一次即可（filter 覆盖全部）
+            }
+        }
+        try reloadFeeds()
     }
 
     /// 启停订阅源

@@ -116,7 +116,7 @@ public enum WebSearchService {
         let keywords = keywords(from: query)
         guard !keywords.isEmpty else { return [] }
 
-        let categories: [NewsFeedCategory] = [.flash, .research, .earnings, .calendar]
+        let categories: [NewsFeedCategory] = [.flash, .calendar]
         let enabledFeeds = feeds.filter { $0.enabled && categories.contains($0.category) }
 
         var results: [WebSearchResult] = []

@@ -4,8 +4,6 @@ import Foundation
 
 public enum NewsFeedCategory: String, Codable, Sendable, CaseIterable, Identifiable {
     case flash       // 快讯（实时新闻）
-    case research    // 研报（机构深度分析）
-    case earnings    // 财报（季度财报）
     case calendar    // 日历（财报日历/重要数据）
 
     public var id: String { rawValue }
@@ -13,8 +11,6 @@ public enum NewsFeedCategory: String, Codable, Sendable, CaseIterable, Identifia
     public var displayName: String {
         switch self {
         case .flash: "快讯"
-        case .research: "研报"
-        case .earnings: "财报"
         case .calendar: "日历"
         }
     }
@@ -22,8 +18,6 @@ public enum NewsFeedCategory: String, Codable, Sendable, CaseIterable, Identifia
     public var icon: String {
         switch self {
         case .flash: "bolt"
-        case .research: "doc.text.magnifyingglass"
-        case .earnings: "chart.bar.doc.horizontal"
         case .calendar: "calendar"
         }
     }
@@ -80,26 +74,15 @@ public enum NewsFeedCatalog {
                  url: "https://www.coindesk.com/arc/outboundfeeds/rss/"),
         NewsFeed(name: "CoinTelegraph", category: .flash, kind: .rss,
                  url: "https://cointelegraph.com/rss"),
-        // 研报（机构深度分析）
-        NewsFeed(name: "McKinsey Insights", category: .research, kind: .rss,
-                 url: "https://www.mckinsey.com/insights/rss"),
-        NewsFeed(name: "MIT Technology Review", category: .research, kind: .rss,
-                 url: "https://www.technologyreview.com/feed"),
-        NewsFeed(name: "Seeking Alpha", category: .research, kind: .rss,
-                 url: "https://seekingalpha.com/market_currents.xml"),
-        NewsFeed(name: "Forbes Business", category: .research, kind: .rss,
-                 url: "https://www.forbes.com/business/feed/"),
-        NewsFeed(name: "Fortune", category: .research, kind: .rss,
-                 url: "https://fortune.com/feed"),
-        // 财报（季度财报新闻）
-        NewsFeed(name: "CNBC Earnings", category: .earnings, kind: .rss,
-                 url: "https://www.cnbc.com/id/15839135/device/rss/rss.html"),
         // 日历（宏观/经济数据新闻；日历页主源为 Investing 经济日历 API）
         NewsFeed(name: "CNBC Economy", category: .calendar, kind: .rss,
                  url: "https://www.cnbc.com/id/20910258/device/rss/rss.html"),
     ]
 
     public static let importedFlagKey = "news_feeds_imported"
+
+    /// 已移除的旧分类 rawValue（研报/财报；旧 DB 中可能残留，启动时清理）
+    public static let removedCategoryRawValues: Set<String> = ["research", "earnings"]
 }
 
 // MARK: - 数据源错误

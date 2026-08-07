@@ -170,7 +170,7 @@ struct CommandPaletteView: View {
 
     private func allItem(for category: NewsFeedCategory) -> AppState.SidebarItem {
         switch category {
-        case .flash, .research, .earnings: .newsCategory(category)
+        case .flash: .flash
         case .calendar: .calendar
         }
     }

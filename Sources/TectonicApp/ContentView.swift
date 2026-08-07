@@ -61,14 +61,10 @@ struct ContentView: View {
             WatchlistView()
         case .markets:
             MarketsView()
-        case .news:
-            // 新闻聚合：快讯 + 研报 + 财报
-            NewsListView(category: nil)
-        case .newsCategory(let category):
-            NewsListView(category: category)
+        case .flash:
+            NewsListView(category: .flash)
         case .newsFeed(let id):
-            NewsListView(category: app.store.newsFeeds.first { $0.id == id }?.category,
-                         sourceID: id)
+            NewsListView(category: .flash, sourceID: id)
         case .calendar:
             CalendarView()
         }

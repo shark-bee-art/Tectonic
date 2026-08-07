@@ -2,56 +2,33 @@ import SwiftUI
 import TectonicIcons
 import CoreKit
 
-// MARK: - 顶部栏（应用图标 + 四 tab + 搜索栏 + 刷新）
+// MARK: - 顶部栏（四 tab 居中 + 搜索栏 + 刷新）
 
 struct TopBar: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
-        HStack(spacing: 0) {
-            // 应用图标（红绿灯安全区 + logo）
-            appIconArea
-                .frame(width: 120)
-                .frame(height: 52)
-
-            // 四 tab：自选 / 市场 / 新闻 / 日历
-            tabArea
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-
-            // 搜索栏（搜索标的 → 添加到自选）+ 刷新
-            actionArea
-                .frame(width: 360)
-                .frame(height: 52)
+        ZStack {
+            HStack(spacing: 0) {
+                // 左侧：红绿灯安全区（hiddenTitleBar 下保留）
+                Spacer().frame(width: 70)
+                Spacer()
+                // 中央：四 tab
+                tabArea
+                Spacer()
+                // 右侧：搜索栏 + 刷新
+                actionArea
+                    .frame(width: 380)
+            }
+            .frame(height: 52)
         }
         .background(DS.bgApp)
     }
 
-    // MARK: 应用图标
-
-    private var appIconArea: some View {
-        HStack(spacing: 8) {
-            // hiddenTitleBar 下为红绿灯留安全区
-            Spacer().frame(width: 70)
-            RoundedRectangle(cornerRadius: DS.radiusMedium)
-                .fill(DS.tradeButton)
-                .frame(width: 24, height: 24)
-                .overlay(
-                    TectonicIconView(icon: .chartLine, size: 13, color: .white)
-                )
-            Text("Tectonic")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(DS.textPrimary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-        }
-        .padding(.trailing, 8)
-    }
-
-    // MARK: 四 tab
+    // MARK: 四 tab（自选 / 行情 / 快讯 / 日历）
 
     private var tabArea: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             tabButton(icon: .star, title: L10n.l("sidebar.watchlist"),
                       selected: app.selectedTab == .watchlist) {
                 select(.watchlist)
@@ -60,25 +37,16 @@ struct TopBar: View {
                       selected: app.selectedTab == .markets) {
                 select(.markets)
             }
-            // 新闻（含子分类菜单）
+            // 快讯（含来源菜单）
             Menu {
                 Button {
-                    select(.news)
+                    select(.flash)
                 } label: {
-                    Label(L10n.l("sidebar.all") + L10n.l("sidebar.news"),
-                          systemImage: "square.grid.2x2")
+                    Label(L10n.l("sidebar.flash"), systemImage: "square.grid.2x2")
                 }
-                Divider()
-                ForEach(NewsFeedCategory.allCases.filter { $0 != .calendar }) { category in
-                    Button {
-                        select(.newsCategory(category))
-                    } label: {
-                        Label(category.displayName, systemImage: "dot.radiowaves.left.and.right")
-                    }
-                }
-                if !allFeeds.isEmpty {
+                if !flashFeeds.isEmpty {
                     Divider()
-                    ForEach(allFeeds) { feed in
+                    ForEach(flashFeeds) { feed in
                         Button {
                             select(.newsFeed(sourceID: feed.id))
                         } label: {
@@ -88,13 +56,13 @@ struct TopBar: View {
                 }
             } label: {
                 HStack(spacing: 5) {
-                    TectonicIconView(icon: .news, size: 14,
+                    TectonicIconView(icon: .bolt, size: 15,
                                      color: app.selectedTab.isNewsTab ? DS.textPrimary : DS.textSecondary)
-                    Text(app.selectedTab.isNewsTab ? currentNewsTitle : L10n.l("sidebar.news"))
-                        .font(.system(size: 13, weight: app.selectedTab.isNewsTab ? .semibold : .regular))
+                    Text(app.selectedTab.isNewsTab ? currentNewsTitle : L10n.l("sidebar.flash"))
+                        .font(.system(size: 15, weight: app.selectedTab.isNewsTab ? .semibold : .regular))
                         .foregroundStyle(app.selectedTab.isNewsTab ? DS.textPrimary : DS.textSecondary)
                         .lineLimit(1)
-                    TectonicIconView(icon: .chevronDown, size: 10, color: DS.textTertiary)
+                    TectonicIconView(icon: .chevronDown, size: 11, color: DS.textTertiary)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -110,33 +78,30 @@ struct TopBar: View {
                       selected: app.selectedTab == .calendar) {
                 select(.calendar)
             }
-            Spacer()
         }
-        .padding(.horizontal, 4)
     }
 
     private var currentNewsTitle: String {
         switch app.selectedTab {
-        case .newsCategory(let c): c.displayName
         case .newsFeed(let id):
-            app.store.newsFeeds.first { $0.id == id }?.name ?? L10n.l("sidebar.news")
-        default: L10n.l("sidebar.news")
+            app.store.newsFeeds.first { $0.id == id }?.name ?? L10n.l("sidebar.flash")
+        default: L10n.l("sidebar.flash")
         }
     }
 
-    private var allFeeds: [NewsFeed] {
-        app.store.newsFeeds.filter { $0.enabled && $0.category != .calendar }
+    private var flashFeeds: [NewsFeed] {
+        app.store.newsFeeds.filter { $0.enabled && $0.category == .flash }
     }
 
     private func tabButton(icon: TectonicIcon, title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                TectonicIconView(icon: icon, size: 14, color: selected ? DS.textPrimary : DS.textSecondary)
+            HStack(spacing: 6) {
+                TectonicIconView(icon: icon, size: 15, color: selected ? DS.textPrimary : DS.textSecondary)
                 Text(title)
-                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 15, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? DS.textPrimary : DS.textSecondary)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 14)
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: DS.radiusCard)
@@ -158,7 +123,7 @@ struct TopBar: View {
         HStack(spacing: 6) {
             // 搜索标的 → 添加到自选
             SymbolSearchField()
-                .frame(width: 220)
+                .frame(width: 280)
             // 刷新
             if app.isRefreshing {
                 TectonicIconView(icon: .refresh, size: 16, color: DS.textSecondary)
@@ -226,10 +191,10 @@ struct SymbolSearchField: View {
                     )
             )
 
-            // 搜索结果下拉
+            // 搜索结果下拉（最多 6 条，避免过高）
             if focused && !results.isEmpty {
                 VStack(spacing: 1) {
-                    ForEach(results) { symbol in
+                    ForEach(results.prefix(6)) { symbol in
                         searchResultRow(symbol)
                     }
                 }
@@ -322,6 +287,10 @@ struct SymbolSearchField: View {
             let added = try app.store.addToWatchlist(symbol)
             if added {
                 addedIDs.insert(symbol.id)
+                // 添加成功：清空输入与结果，收起下拉，恢复原样
+                query = ""
+                results = []
+                focused = false
                 // 反馈 2 秒后移除标记
                 Task {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
