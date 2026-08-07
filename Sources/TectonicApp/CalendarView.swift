@@ -2,6 +2,7 @@ import SwiftUI
 import CoreKit
 
 /// 宏观经济日历：各国统计局发布数据（CPI / GDP / PMI 等），按天分组
+/// TradingView 淡雅：卡片化 + 新色板 + Tabler 图标
 struct CalendarView: View {
     @EnvironmentObject var app: AppState
 
@@ -13,7 +14,7 @@ struct CalendarView: View {
                 eventList
             }
         }
-        .navigationTitle(L10n.l("sidebar.calendar"))
+        .background(DS.bgPanel)
         .task {
             await app.store.fetchCalendarEvents()
         }
@@ -22,33 +23,20 @@ struct CalendarView: View {
     // MARK: 空/加载状态
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        Group {
             if app.store.calendarLoading {
-                ProgressView(L10n.l("common.loading"))
+                DSPlaceholder(icon: .clock, title: L10n.l("common.loading"))
             } else if let err = app.store.calendarError {
-                Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.tertiary)
-                Text("加载失败：\(err)")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-                Button(L10n.l("common.refresh")) {
-                    Task { await app.store.fetchCalendarEvents() }
-                }
+                DSPlaceholder(icon: .wifiOff,
+                              title: "加载失败：\(err)",
+                              actionTitle: L10n.l("common.refresh"),
+                              action: { Task { await app.store.fetchCalendarEvents() } })
             } else {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 40))
-                    .foregroundStyle(.tertiary)
-                Text(L10n.l("sidebar.calendar"))
-                    .font(.title3)
-                Text("加载各国经济数据…")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                DSPlaceholder(icon: .calendar,
+                              title: L10n.l("sidebar.calendar"),
+                              subtitle: L10n.l("calendar.loadingHint"))
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: 事件列表（按天分组）
@@ -57,7 +45,7 @@ struct CalendarView: View {
         let grouped = Dictionary(grouping: app.store.calendarEvents, by: { $0.dayKey })
         let days = grouped.keys.sorted()
         return ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 16) {
                 ForEach(days, id: \.self) { day in
                     daySection(day: day, events: grouped[day] ?? [])
                 }
@@ -68,34 +56,31 @@ struct CalendarView: View {
 
     private func daySection(day: String, events: [EconomicEvent]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 天标题：8月4日 星期二
+            // 天标题
             HStack(spacing: 8) {
                 if isToday(day) {
-                    Text("今天")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                        .foregroundStyle(Color.accentColor)
+                    DSChip(text: L10n.l("news.today"), color: DS.accent)
                 }
                 Text(dayTitle(day))
-                    .font(.headline)
+                    .font(.system(size: DS.listTitleSize, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
                 Spacer()
                 Text("\(events.count) 项")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: DS.metaSize))
+                    .foregroundStyle(DS.textTertiary)
             }
             .padding(.bottom, 2)
 
-            VStack(spacing: 0) {
-                ForEach(Array(events.enumerated()), id: \.offset) { idx, event in
-                    EconomicEventRow(event: event)
-                    if idx < events.count - 1 {
-                        Divider().padding(.leading, 90)
+            DSCard(padding: 0) {
+                VStack(spacing: 0) {
+                    ForEach(Array(events.enumerated()), id: \.offset) { idx, event in
+                        EconomicEventRow(event: event)
+                        if idx < events.count - 1 {
+                            DSDivider().padding(.leading, 90)
+                        }
                     }
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.05)))
         }
     }
 
@@ -124,34 +109,35 @@ struct EconomicEventRow: View {
         HStack(spacing: 10) {
             // 时间
             Text(event.datetime.formatted(.dateTime.hour().minute()))
-                .font(.callout.monospacedDigit())
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13).monospacedDigit())
+                .foregroundStyle(DS.textSecondary)
                 .frame(width: 46, alignment: .leading)
             // 地区
             Text(countryShort(event.country))
-                .font(.caption2.weight(.semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .frame(width: 34)
                 .padding(.vertical, 3)
-                .background(Capsule().fill(countryColor(event.country).opacity(0.15)))
+                .background(Capsule().fill(countryColor(event.country).opacity(0.12)))
                 .foregroundStyle(countryColor(event.country))
             // 事件名
             Text(event.title)
-                .font(.callout)
+                .font(.system(size: 13))
+                .foregroundStyle(DS.textPrimary)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
             // 重要性
             HStack(spacing: 2) {
                 ForEach(0..<3, id: \.self) { i in
                     Circle()
-                        .fill(i < event.importance ? importanceColor(event.importance) : Color.secondary.opacity(0.15))
+                        .fill(i < event.importance ? importanceColor(event.importance) : DS.border)
                         .frame(width: 6, height: 6)
                 }
             }
             .frame(width: 30)
             // 实际 / 预测 / 前值
-            valueCell("实际", event.actual, bold: true)
-            valueCell("预测", event.forecast, bold: false)
-            valueCell("前值", event.previous, bold: false)
+            valueCell(L10n.l("calendar.actual"), event.actual, bold: true)
+            valueCell(L10n.l("calendar.forecast"), event.forecast, bold: false)
+            valueCell(L10n.l("calendar.previous"), event.previous, bold: false)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -160,12 +146,12 @@ struct EconomicEventRow: View {
     private func valueCell(_ label: String, _ value: String?, bold: Bool) -> some View {
         VStack(alignment: .trailing, spacing: 1) {
             Text(label)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .font(.system(size: 10))
+                .foregroundStyle(DS.textTertiary)
             Text(value ?? "—")
-                .font(.callout.monospacedDigit())
+                .font(.system(size: 13).monospacedDigit())
                 .fontWeight(bold ? .semibold : .regular)
-                .foregroundStyle(value == nil ? Color.secondary.opacity(0.5) : Color.primary)
+                .foregroundStyle(value == nil ? DS.textTertiary : DS.textPrimary)
         }
         .frame(width: 72, alignment: .trailing)
     }
@@ -185,23 +171,23 @@ struct EconomicEventRow: View {
 
     private func countryColor(_ c: String) -> Color {
         switch countryShort(c) {
-        case "US": .blue
-        case "CN": .red
+        case "US": DS.accent
+        case "CN": DS.up
         case "EU": .indigo
         case "JP": .pink
         case "UK": .purple
         case "DE": .orange
         case "AU": .teal
-        case "CA": .green
-        default: .gray
+        case "CA": DS.down
+        default: DS.neutral
         }
     }
 
     private func importanceColor(_ level: Int) -> Color {
         switch level {
-        case 3: .red
+        case 3: DS.up
         case 2: .orange
-        default: .gray
+        default: DS.neutral
         }
     }
 }

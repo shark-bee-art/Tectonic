@@ -6,6 +6,8 @@ struct TectonicApp: App {
     @StateObject private var appState: AppState
 
     init() {
+        // 注册 Tabler Icons 字体（设计系统图标）
+        TectonicIcon.registerFont()
         let db = try! AppDatabase.makeDefault()
         _appState = StateObject(wrappedValue: AppState(db: db))
     }
@@ -16,15 +18,22 @@ struct TectonicApp: App {
                 .environmentObject(appState)
                 .frame(minWidth: 1000, minHeight: 640)
                 // 主题：强调色 + 明暗外观跟随所选主题（设置「通用」里切换）
-                .tint(Color(hex: appState.theme.accent) ?? .accentColor)
+                .tint(DS.accent)
                 .preferredColorScheme(appState.theme.isDark ? .dark : .light)
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             CommandGroup(after: .sidebar) {
                 Button("刷新行情") {
                     Task { await appState.refreshAll() }
                 }
                 .keyboardShortcut("r", modifiers: [.command])
+            }
+            CommandGroup(replacing: .textEditing) {
+                Button("命令面板") {
+                    NotificationCenter.default.post(name: .commandPaletteToggle, object: nil)
+                }
+                .keyboardShortcut("k", modifiers: [.command])
             }
         }
         Settings {
@@ -33,7 +42,7 @@ struct TectonicApp: App {
                 .environmentObject(appState.aiSettings)
                 .frame(width: 640, height: 620)
                 // 设置窗口同样跟随主题
-                .tint(Color(hex: appState.theme.accent) ?? .accentColor)
+                .tint(DS.accent)
                 .preferredColorScheme(appState.theme.isDark ? .dark : .light)
         }
     }

@@ -11,16 +11,16 @@ struct SettingsView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             GeneralSettingsTab()
-                .tabItem { Label(L10n.l("settings.generalTab"), systemImage: "gearshape") }
+                .tabItem { Label { Text(L10n.l("settings.generalTab")) } icon: { TectonicIconView(icon: .settings, size: 14, color: DS.textSecondary) } }
                 .tag("general")
             MarketSettingsTab()
-                .tabItem { Label(L10n.l("settings.marketTab"), systemImage: "chart.bar") }
+                .tabItem { Label { Text(L10n.l("settings.marketTab")) } icon: { TectonicIconView(icon: .chartBar, size: 14, color: DS.textSecondary) } }
                 .tag("market")
             AISettingsTab()
-                .tabItem { Label(L10n.l("settings.aiTab"), systemImage: "brain") }
+                .tabItem { Label { Text(L10n.l("settings.aiTab")) } icon: { TectonicIconView(icon: .sparkles, size: 14, color: DS.textSecondary) } }
                 .tag("ai")
             NewsSettingsTab()
-                .tabItem { Label(L10n.l("settings.newsTab"), systemImage: "newspaper") }
+                .tabItem { Label { Text(L10n.l("settings.newsTab")) } icon: { TectonicIconView(icon: .news, size: 14, color: DS.textSecondary) } }
                 .tag("news")
         }
         .padding(20)
@@ -107,9 +107,8 @@ struct GeneralSettingsTab: View {
 
                 Spacer()
 
-                Image(systemName: selected ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 13))
-                    .foregroundStyle(selected ? Color.accentColor : Color.secondary)
+                TectonicIconView(icon: selected ? .circleCheck : .circle, size: 15,
+                                 color: selected ? DS.accent : DS.textTertiary)
             }
             .padding(.vertical, 3)
             .contentShape(Rectangle())
@@ -154,8 +153,7 @@ struct NewsSettingsTab: View {
                                 Button {
                                     try? app.store.removeFeed(feed)
                                 } label: {
-                                    Image(systemName: "xmark.circle")
-                                        .foregroundStyle(.secondary)
+                                    TectonicIconView(icon: .circleX, size: 14, color: DS.textSecondary)
                                 }
                                 .buttonStyle(.borderless)
                                 .help("删除订阅源")
@@ -253,7 +251,7 @@ struct MarketSettingsTab: View {
                             set: { app.settings.setEnabled(market, enabled: $0) }
                         )) {
                             HStack {
-                                Image(systemName: marketIcon(market))
+                                TectonicIconView(icon: marketIcon(market), size: 15, color: DS.textSecondary)
                                     .frame(width: 18)
                                 Text(market.displayName)
                                 Spacer()
@@ -277,16 +275,16 @@ struct MarketSettingsTab: View {
         .padding(12)
     }
 
-    private func marketIcon(_ m: Market) -> String {
+    private func marketIcon(_ m: Market) -> TectonicIcon {
         switch m {
-        case .us: "building.columns"
-        case .crypto: "bitcoinsign"
-        case .hk: "building.2"
-        case .cn: "building"
-        case .fund: "chart.pie"
-        case .kr: "building.2.crop.circle"
-        case .jp: "sun.max"
-        case .tw: "mountain.2"
+        case .us: .buildingBank
+        case .crypto: .currencyBitcoin
+        case .hk: .buildingSkyscraper
+        case .cn: .building
+        case .fund: .chartDonut
+        case .kr: .buildingCommunity
+        case .jp: .sun
+        case .tw: .mountain
         }
     }
 }
@@ -381,7 +379,7 @@ struct AISettingsTab: View {
                     .environmentObject(ai)
                 if let url = keyApplicationURL(for: ai.provider) {
                     Link(destination: url) {
-                        Label("申请 \(ai.provider.displayName) API Key", systemImage: "arrow.up.right.square")
+                        Label { Text("申请 \(ai.provider.displayName) API Key") } icon: { TectonicIconView(icon: .externalLink, size: 12, color: DS.accent) }
                     }
                 }
             }
@@ -490,10 +488,8 @@ struct ProviderRow: View {
             ai.provider = provider
         } label: {
             HStack {
-                Image(systemName: ai.provider == provider
-                      ? "largecircle.fill.circle" : "circle")
-                    .foregroundStyle(ai.provider == provider
-                                     ? Color.accentColor : Color.secondary)
+                TectonicIconView(icon: ai.provider == provider ? .circleCheck : .circle, size: 15,
+                                 color: ai.provider == provider ? DS.accent : DS.textTertiary)
                 Text(provider.displayName)
                 Spacer()
                 if !(ai.apiKey(for: provider) ?? "").isEmpty {

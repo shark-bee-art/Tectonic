@@ -7,31 +7,57 @@ struct WatchlistView: View {
 
     var body: some View {
         let groups = app.store.groups()
-        List(selection: $app.selectedSymbol) {
-            ForEach(groups, id: \.self) { group in
-                let items = app.store.watchlist.filter { $0.group == group }
-                Section(group) {
-                    ForEach(items, id: \.symbol.id) { item in
-                        QuoteRow(symbol: item.symbol,
-                                 quote: app.store.quotes[item.symbol.id])
-                            .tag(item.symbol)
+        ScrollView {
+            VStack(spacing: 6) {
+                ForEach(groups, id: \.self) { group in
+                    let items = app.store.watchlist.filter { $0.group == group }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(group)
+                            .font(.system(size: DS.metaSize, weight: .semibold))
+                            .foregroundStyle(DS.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 8)
+                        ForEach(items, id: \.symbol.id) { item in
+                            DSQuoteRow(name: item.symbol.name,
+                                       subtitle: "\(item.symbol.code) · \(item.symbol.market.displayName)",
+                                       price: quotePrice(item.symbol),
+                                       change: quoteChange(item.symbol),
+                                       isSelected: app.selectedSymbol?.id == item.symbol.id) {
+                                app.selectedSymbol = item.symbol
+                            }
+                            .task(id: item.symbol.id) {
+                                if app.store.quotes[item.symbol.id] == nil {
+                                    if let q = await app.store.quote(for: item.symbol) {
+                                        app.store.updateQuote(q)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
+            .padding(.vertical, 6)
         }
-        .scrollContentBackground(.hidden)
         .overlay {
             if app.store.watchlist.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "star")
-                        .font(.system(size: 40))
-                        .foregroundStyle(.tertiary)
-                    Text("自选为空\n点击右上角 + 添加标的")
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
-                }
+                DSPlaceholder(icon: .star,
+                              title: L10n.l("watchlist.empty"),
+                              subtitle: L10n.l("watchlist.emptyHint"))
             }
         }
+    }
+
+    private func quotePrice(_ symbol: Symbol) -> String? {
+        guard let q = app.store.quotes[symbol.id] else { return nil }
+        return "\(fmt(q.price)) \(symbol.currency)"
+    }
+
+    private func quoteChange(_ symbol: Symbol) -> Double? {
+        app.store.quotes[symbol.id]?.changePercent
+    }
+
+    private func fmt(_ v: Double) -> String {
+        v >= 100 ? String(format: "%.2f", v) : String(format: "%.4f", v)
     }
 }
 
@@ -41,37 +67,56 @@ struct MarketsView: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
-        List(selection: $app.selectedSymbol) {
-            ForEach(app.activeMarkets) { market in
-                let symbols = symbols(for: market)
-                Section {
-                    if symbols.isEmpty {
-                        Text("点击右上角 + 添加")
-                            .foregroundStyle(.tertiary)
-                    } else {
-                        ForEach(symbols, id: \.id) { symbol in
-                            QuoteRow(symbol: symbol,
-                                     quote: app.store.quotes[symbol.id])
-                                .tag(symbol)
+        ScrollView {
+            VStack(spacing: 6) {
+                ForEach(app.activeMarkets) { market in
+                    let symbols = symbols(for: market)
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text(market.displayName)
+                                .font(.system(size: DS.metaSize, weight: .semibold))
+                                .foregroundStyle(DS.textSecondary)
+                            Spacer()
+                            Text(market.tradingHours)
+                                .font(.system(size: 10))
+                                .foregroundStyle(DS.textTertiary)
                         }
-                    }
-                } header: {
-                    HStack {
-                        Text(market.displayName)
-                        Spacer()
-                        Text(market.tradingHours)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+
+                        if symbols.isEmpty {
+                            Text(L10n.l("markets.empty"))
+                                .font(.system(size: DS.captionSize))
+                                .foregroundStyle(DS.textTertiary)
+                                .padding(.horizontal, 10)
+                        } else {
+                            ForEach(symbols, id: \.id) { symbol in
+                                DSQuoteRow(name: symbol.name,
+                                           subtitle: "\(symbol.code) · \(symbol.market.displayName)",
+                                           price: quotePrice(symbol),
+                                           change: quoteChange(symbol),
+                                           isSelected: app.selectedSymbol?.id == symbol.id) {
+                                    app.selectedSymbol = symbol
+                                }
+                                .task(id: symbol.id) {
+                                    if app.store.quotes[symbol.id] == nil {
+                                        if let q = await app.store.quote(for: symbol) {
+                                            app.store.updateQuote(q)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
+            .padding(.vertical, 6)
         }
-        .scrollContentBackground(.hidden)
         .overlay {
             if app.activeMarkets.isEmpty {
-                Text("未启用任何市场\n请到设置中开启")
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
+                DSPlaceholder(icon: .chartLine,
+                              title: L10n.l("markets.disabled"),
+                              subtitle: L10n.l("markets.disabledHint"))
             }
         }
     }
@@ -82,57 +127,17 @@ struct MarketsView: View {
             .filter { $0.symbol.market == market }
             .map(\.symbol)
     }
-}
 
-// MARK: - 行情行
-
-struct QuoteRow: View {
-    @EnvironmentObject var app: AppState
-    let symbol: Symbol
-    let quote: Quote?
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(symbol.name)
-                    .lineLimit(1)
-                Text("\(symbol.code) · \(symbol.market.displayName)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if let quote {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(fmtPrice(quote.price)) \(symbol.currency)")
-                        .font(.body.monospacedDigit())
-                        .foregroundStyle(quote.change >= 0 ? Color.red : Color.green)
-                    Text("\(fmtSigned(quote.change))  \(fmtPercent(quote.changePercent))")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(quote.change >= 0 ? Color.red : Color.green)
-                }
-            } else {
-                ProgressView()
-                    .controlSize(.small)
-            }
-        }
-        .padding(.vertical, 2)
-        .task(id: symbol.id) {
-            if app.store.quotes[symbol.id] == nil {
-                let q = await app.store.quote(for: symbol)
-                if let q {
-                    app.store.updateQuote(q)
-                }
-            }
-        }
+    private func quotePrice(_ symbol: Symbol) -> String? {
+        guard let q = app.store.quotes[symbol.id] else { return nil }
+        return "\(fmt(q.price)) \(symbol.currency)"
     }
 
-    private func fmtPrice(_ v: Double) -> String {
+    private func quoteChange(_ symbol: Symbol) -> Double? {
+        app.store.quotes[symbol.id]?.changePercent
+    }
+
+    private func fmt(_ v: Double) -> String {
         v >= 100 ? String(format: "%.2f", v) : String(format: "%.4f", v)
-    }
-    private func fmtSigned(_ v: Double) -> String {
-        String(format: "%+.2f", v)
-    }
-    private func fmtPercent(_ v: Double) -> String {
-        String(format: "%+.2f%%", v)
     }
 }

@@ -25,6 +25,12 @@ final class AppState: ObservableObject {
     @Published var isRefreshing = false
     /// 右侧 AI 问询面板（nil = 关闭）
     @Published var chatPanel: ChatPanelContext?
+    /// 顶部搜索框词（全局过滤当前列表）
+    @Published var searchText = ""
+    /// ⌘K 命令面板可见性
+    @Published var showCommandPalette = false
+    /// 「添加标的」面板请求（命令面板触发）
+    @Published var openAddSymbol = false
 
     enum SidebarItem: Hashable {
         case watchlist

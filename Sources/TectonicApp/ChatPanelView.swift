@@ -49,7 +49,7 @@ struct ChatPanelView: View {
             RoundedRectangle(cornerRadius: 9)
                 .fill(LinearGradient(colors: [.accentColor, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 30, height: 30)
-                .overlay(Image(systemName: "sparkles").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white))
+                .overlay(TectonicIconView(icon: .sparkles, size: 14, color: .white))
             VStack(alignment: .leading, spacing: 2) {
                 Text(context.title)
                     .font(.headline)
@@ -59,9 +59,12 @@ struct ChatPanelView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                     if ai.webSearchEnabled {
-                        Label(L10n.l("chat.webSearchOn"), systemImage: "globe")
-                            .font(.caption2)
-                            .foregroundStyle(.blue)
+                        HStack(spacing: 3) {
+                            TectonicIconView(icon: .globe, size: 11, color: DS.accent)
+                            Text(L10n.l("chat.webSearchOn"))
+                        }
+                        .font(.system(size: 10))
+                        .foregroundStyle(DS.accent)
                     }
                 }
             }
@@ -71,7 +74,7 @@ struct ChatPanelView: View {
                 messages = []
                 searchedSources = []
             } label: {
-                Image(systemName: "trash")
+                TectonicIconView(icon: .trash, size: 16, color: DS.textSecondary)
             }
             .buttonStyle(.borderless)
             .help(L10n.l("chat.clear"))
@@ -79,7 +82,7 @@ struct ChatPanelView: View {
             Button {
                 app.chatPanel = nil
             } label: {
-                Image(systemName: "xmark.circle.fill")
+                TectonicIconView(icon: .x, size: 16, color: DS.textSecondary)
                     .font(.title3)
                     .foregroundStyle(.secondary)
             }
@@ -96,9 +99,7 @@ struct ChatPanelView: View {
                     if messages.isEmpty {
                         // 空状态（主流聊天 UI：欢迎提示）
                         VStack(spacing: 10) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 34))
-                                .foregroundStyle(.tertiary)
+                            TectonicIconView(icon: .sparkles, size: 34, color: DS.textTertiary)
                             Text(context.subtitle)
                                 .font(.callout)
                                 .foregroundStyle(.secondary)
@@ -131,7 +132,7 @@ struct ChatPanelView: View {
                 RoundedRectangle(cornerRadius: 7)
                     .fill(LinearGradient(colors: [.accentColor, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 24, height: 24)
-                    .overlay(Image(systemName: "sparkles").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white))
+                    .overlay(TectonicIconView(icon: .sparkles, size: 11, color: .white))
             }
             VStack(alignment: .leading, spacing: 3) {
                 if msg.role == "assistant" {
@@ -147,8 +148,8 @@ struct ChatPanelView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(msg.role == "user"
-                                  ? Color.accentColor.opacity(0.13)
-                                  : Color.secondary.opacity(0.08))
+                                  ? DS.accent.opacity(0.13)
+                                  : DS.bgHover)
                     )
                     .frame(maxWidth: 320, alignment: msg.role == "user" ? .trailing : .leading)
             }
@@ -164,7 +165,7 @@ struct ChatPanelView: View {
             RoundedRectangle(cornerRadius: 7)
                 .fill(LinearGradient(colors: [.accentColor, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .frame(width: 24, height: 24)
-                .overlay(Image(systemName: "sparkles").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white))
+                .overlay(TectonicIconView(icon: .sparkles, size: 11, color: .white))
             VStack(alignment: .leading, spacing: 4) {
                 Text(L10n.l("common.thinking"))
                     .font(.caption2)
@@ -172,7 +173,7 @@ struct ChatPanelView: View {
                 HStack(spacing: 4) {
                     ForEach(0..<3, id: \.self) { i in
                         Circle()
-                            .fill(Color.secondary.opacity(0.5))
+                            .fill(DS.textTertiary)
                             .frame(width: 5, height: 5)
                             .opacity(isThinking ? (i == 0 ? 1 : 0.3) : 0.3)
                     }
@@ -202,10 +203,13 @@ struct ChatPanelView: View {
                 Spacer()
                 // 联网搜索状态（默认开启，无需开关）
                 if ai.webSearchEnabled {
-                    Label(L10n.l("chat.webSearchOn"), systemImage: "globe")
-                        .font(.caption2)
-                        .foregroundStyle(.blue)
-                        .help(L10n.l("chat.webSearchHint"))
+                    HStack(spacing: 3) {
+                        TectonicIconView(icon: .globe, size: 11, color: DS.accent)
+                        Text(L10n.l("chat.webSearchOn"))
+                    }
+                    .font(.system(size: 10))
+                    .foregroundStyle(DS.accent)
+                    .help(L10n.l("chat.webSearchHint"))
                 }
                 if !searchedSources.isEmpty {
                     Text("\(searchedSources.count)")
@@ -218,15 +222,15 @@ struct ChatPanelView: View {
                     .textFieldStyle(.plain)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.secondary.opacity(0.10)))
+                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(DS.bgHover))
                     .focused($inputFocused)
                     .onSubmit { send() }
                 Button {
                     send()
                 } label: {
-                    Image(systemName: "arrow.up.circle.fill")
+                    TectonicIconView(icon: .send, size: 24, color: input.isEmpty || isThinking ? DS.textTertiary : DS.accent)
                         .font(.system(size: 26))
-                        .foregroundStyle(input.isEmpty || isThinking ? Color.secondary.opacity(0.4) : Color.accentColor)
+                        .foregroundStyle(input.isEmpty || isThinking ? DS.textTertiary : DS.accent)
                 }
                 .buttonStyle(.borderless)
                 .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isThinking)

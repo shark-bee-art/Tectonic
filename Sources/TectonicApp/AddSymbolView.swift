@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreKit
 
-/// 添加标的：搜索 → 结果列表 → 添加自选
+/// 添加标的：搜索 → 结果列表 → 添加自选（TradingView 淡雅组件）
 struct AddSymbolButton: View {
     @EnvironmentObject var app: AppState
     @State private var isPresented = false
@@ -10,14 +10,27 @@ struct AddSymbolButton: View {
         Button {
             isPresented = true
         } label: {
-            Label("添加标的", systemImage: "plus")
+            TectonicIconView(icon: .plus, size: 16, color: DS.textSecondary)
+                .padding(6)
+                .background(
+                    RoundedRectangle(cornerRadius: DS.radiusMedium)
+                        .fill(DS.bgHover)
+                )
         }
+        .buttonStyle(.plain)
         .help("添加标的 (⌘N)")
         .keyboardShortcut("n", modifiers: .command)
         .popover(isPresented: $isPresented, arrowEdge: .bottom) {
             AddSymbolPopover()
                 .environmentObject(app)
-                .frame(width: 420)
+                .frame(width: 440)
+        }
+        // 命令面板「添加标的」触发
+        .onChange(of: app.openAddSymbol) { _, v in
+            if v {
+                isPresented = true
+                app.openAddSymbol = false
+            }
         }
     }
 }
@@ -36,14 +49,21 @@ struct AddSymbolPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("添加标的")
-                .font(.headline)
+            HStack(spacing: 8) {
+                TectonicIconView(icon: .plus, size: 16, color: DS.accent)
+                Text(L10n.l("add.title"))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+            }
 
             if let msg = addedMessage {
-                Label(msg, systemImage: "checkmark.circle.fill")
-                    .font(.callout)
-                    .foregroundStyle(.green)
-                    .transition(.opacity)
+                HStack(spacing: 6) {
+                    TectonicIconView(icon: .circleCheck, size: 14, color: DS.down)
+                    Text(msg)
+                        .font(.system(size: DS.captionSize))
+                        .foregroundStyle(DS.down)
+                }
+                .transition(.opacity)
             }
 
             HStack(spacing: 8) {
@@ -53,11 +73,11 @@ struct AddSymbolPopover: View {
                         Text(m.displayName).tag(Market?.some(m))
                     }
                 }
+                .pickerStyle(.menu)
                 .frame(width: 110)
-                TextField("代码或名称，如 AAPL / 600519 / BTCUSDT", text: $query)
-                    .textFieldStyle(.roundedBorder)
+                DSInputField(text: $query, placeholder: L10n.l("add.searchHint"))
                     .onSubmit { search() }
-                Button("搜索") { search() }
+                DSButton(L10n.l("add.search"), icon: .search, prominent: true) { search() }
                     .disabled(query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSearching)
             }
 
@@ -65,55 +85,63 @@ struct AddSymbolPopover: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else if results.isEmpty && !query.isEmpty {
-                Text("无匹配结果（可尝试输入代码精确搜索）")
-                    .foregroundStyle(.secondary)
+                Text(L10n.l("add.noResult"))
+                    .font(.system(size: DS.captionSize))
+                    .foregroundStyle(DS.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
             } else if !results.isEmpty {
-                List(results, id: \.id) { symbol in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(symbol.name)
-                            Text("\(symbol.market.displayName) \(symbol.code)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if app.store.isInWatchlist(symbol) {
-                            Label("已添加", systemImage: "checkmark.circle.fill")
-                                .font(.callout)
-                                .foregroundStyle(.green)
-                        } else if lastAdded == symbol.id {
-                            Label("已添加", systemImage: "checkmark.circle.fill")
-                                .font(.callout)
-                                .foregroundStyle(.green)
-                        } else {
-                            Button("添加") {
-                                add(symbol)
-                            }
-                            .controlSize(.small)
-                            .buttonStyle(.borderedProminent)
+                ScrollView {
+                    VStack(spacing: 2) {
+                        ForEach(results, id: \.id) { symbol in
+                            symbolRow(symbol)
                         }
                     }
                 }
-                .listStyle(.inset)
-                .scrollContentBackground(.hidden)
                 .frame(minHeight: 90, maxHeight: 260)
             } else {
-                Text("输入代码或名称开始搜索\n支持：AAPL、600519、00700.HK、BTCUSDT、110022、7203.T 等")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(L10n.l("add.hint"))
+                    .font(.system(size: DS.captionSize))
+                    .foregroundStyle(DS.textSecondary)
                     .frame(maxWidth: .infinity, minHeight: 120)
             }
 
             HStack {
-                TextField("分组（默认：默认分组）", text: $groupName)
-                    .textFieldStyle(.roundedBorder)
+                DSInputField(text: $groupName, placeholder: L10n.l("add.groupHint"))
                     .frame(width: 200)
                 Spacer()
-                Button("完成") { dismiss() }
+                DSButton(L10n.l("add.done"), icon: .check, prominent: true) { dismiss() }
             }
         }
         .padding(16)
+    }
+
+    private func symbolRow(_ symbol: Symbol) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(symbol.name)
+                    .font(.system(size: DS.listTitleSize, weight: .medium))
+                    .foregroundStyle(DS.textPrimary)
+                Text("\(symbol.market.displayName) \(symbol.code)")
+                    .font(.system(size: DS.metaSize))
+                    .foregroundStyle(DS.textSecondary)
+            }
+            Spacer()
+            if app.store.isInWatchlist(symbol) || lastAdded == symbol.id {
+                HStack(spacing: 4) {
+                    TectonicIconView(icon: .circleCheck, size: 14, color: DS.down)
+                    Text(L10n.l("add.added"))
+                        .font(.system(size: DS.captionSize, weight: .medium))
+                        .foregroundStyle(DS.down)
+                }
+            } else {
+                DSButton(L10n.l("add.add"), icon: .plus, prominent: true) {
+                    add(symbol)
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
     }
 
     private func search() {

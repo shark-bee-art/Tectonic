@@ -3,6 +3,7 @@ import CoreKit
 
 /// 资讯分类列表：快讯/研报/财报/日历 通用；日历按日期分组
 /// sourceID 非 nil 时只显示该订阅源（侧边栏子菜单独立查看）
+/// TradingView 淡雅强化：时间列居左 + 来源标签居右 + hover 箭头/背景反馈
 struct NewsListView: View {
     @EnvironmentObject var app: AppState
     let category: NewsFeedCategory
@@ -24,11 +25,22 @@ struct NewsListView: View {
         sourceFeed?.name ?? category.displayName
     }
 
+    /// 搜索结果（顶部搜索框过滤标题/摘要）
+    private var filteredItems: [NewsItem] {
+        let q = app.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return items }
+        return items.filter {
+            $0.title.localizedCaseInsensitiveContains(q)
+                || $0.summary.localizedCaseInsensitiveContains(q)
+                || $0.source.localizedCaseInsensitiveContains(q)
+        }
+    }
+
     /// 按日期分组（日历/财报用）
     private var grouped: [(Date, [NewsItem])] {
         let cal = Calendar.current
         var buckets: [Date: [NewsItem]] = [:]
-        for item in items {
+        for item in filteredItems {
             let day = cal.startOfDay(for: item.publishedAt)
             buckets[day, default: []].append(item)
         }
@@ -38,62 +50,35 @@ struct NewsListView: View {
     var body: some View {
         VStack(spacing: 0) {
             // 顶部工具条
-            HStack {
-                Label(titleText, systemImage: category.icon)
-                    .font(.headline)
+            HStack(spacing: 8) {
+                TectonicIconView(icon: categoryIcon, size: 16, color: DS.textPrimary)
+                Text(titleText)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                    .lineLimit(1)
                 Spacer()
                 if let last = items.first?.publishedAt {
                     Text("更新于 \(last.formatted(.relative(presentation: .named)))")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: DS.metaSize))
+                        .foregroundStyle(DS.textTertiary)
                 }
-                Button {
+                DSIconButton(icon: .refresh, help: L10n.l("common.refresh")) {
                     refreshTick += 1
-                } label: {
-                    Label("刷新", systemImage: "arrow.clockwise")
                 }
                 .disabled(isLoading)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
-            Divider()
+            DSDivider()
 
-            List(selection: $app.selectedNews) {
-                if category == .calendar || category == .earnings {
-                    // 按日期分组展示
-                    ForEach(grouped, id: \.0) { day, dayItems in
-                        Section(header: Text(dayHeader(day))) {
-                            ForEach(dayItems) { item in
-                                NewsRow(item: item)
-                                    .tag(item)
-                            }
-                        }
-                    }
-                } else {
-                    ForEach(items) { item in
-                        NewsRow(item: item)
-                            .tag(item)
-                    }
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .overlay {
-                if isLoading && items.isEmpty {
-                    ProgressView("加载中…")
-                } else if let lastError, items.isEmpty {
-                    VStack(spacing: 8) {
-                        Text(lastError)
-                            .foregroundStyle(.secondary)
-                        Button("重试") { refreshTick += 1 }
-                    }
-                } else if items.isEmpty {
-                    Text("暂无内容\n请在设置 → 资讯源中启用订阅源")
-                        .multilineTextAlignment(.center)
-                        .foregroundStyle(.secondary)
-                }
+            if category == .calendar || category == .earnings {
+                groupedList
+            } else {
+                plainList
             }
         }
+        .background(DS.bgPanel)
         .task(id: "\(category.rawValue)-\(sourceID ?? "")-\(refreshTick)") {
             await load()
         }
@@ -106,11 +91,89 @@ struct NewsListView: View {
         }
     }
 
+    // MARK: 列表（按日期分组）
+
+    private var groupedList: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(grouped, id: \.0) { day, dayItems in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            if Calendar.current.isDateInToday(day) {
+                                DSChip(text: L10n.l("news.today"), color: DS.accent)
+                            }
+                            Text(dayHeader(day))
+                                .font(.system(size: DS.listTitleSize, weight: .semibold))
+                                .foregroundStyle(DS.textPrimary)
+                            Spacer()
+                            Text("\(dayItems.count) 项")
+                                .font(.system(size: DS.metaSize))
+                                .foregroundStyle(DS.textTertiary)
+                        }
+                        .padding(.horizontal, 10)
+
+                        ForEach(dayItems) { item in
+                            NewsRow(item: item)
+                                .onTapGesture { app.selectedNews = item }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .overlay { overlayState }
+    }
+
+    // MARK: 列表（平铺）
+
+    private var plainList: some View {
+        ScrollView {
+            LazyVStack(spacing: 2) {
+                ForEach(filteredItems) { item in
+                    NewsRow(item: item)
+                        .onTapGesture { app.selectedNews = item }
+                }
+            }
+            .padding(.vertical, 6)
+        }
+        .overlay { overlayState }
+    }
+
+    @ViewBuilder
+    private var overlayState: some View {
+        if isLoading && filteredItems.isEmpty {
+            DSPlaceholder(icon: .refresh, title: L10n.l("common.loading"))
+        } else if let lastError, filteredItems.isEmpty {
+            DSPlaceholder(icon: .alertTriangle,
+                          title: lastError,
+                          actionTitle: L10n.l("common.refresh"),
+                          action: { refreshTick += 1 })
+        } else if filteredItems.isEmpty && !items.isEmpty {
+            // 有数据但搜索无结果
+            DSPlaceholder(icon: .searchOff,
+                          title: L10n.l("news.searchEmpty"),
+                          subtitle: "\"\(app.searchText)\"")
+        } else if filteredItems.isEmpty {
+            DSPlaceholder(icon: .news,
+                          title: L10n.l("news.empty"),
+                          subtitle: L10n.l("news.emptyHint"))
+        }
+    }
+
+    private var categoryIcon: TectonicIcon {
+        switch category {
+        case .flash: .bolt
+        case .research: .fileText
+        case .earnings: .chartBar
+        case .calendar: .calendar
+        }
+    }
+
     private func dayHeader(_ day: Date) -> String {
         let cal = Calendar.current
-        if cal.isDateInToday(day) { return "今天" }
-        if cal.isDateInTomorrow(day) { return "明天" }
-        if cal.isDateInYesterday(day) { return "昨天" }
+        if cal.isDateInToday(day) { return L10n.l("news.today") }
+        if cal.isDateInTomorrow(day) { return L10n.l("news.tomorrow") }
+        if cal.isDateInYesterday(day) { return L10n.l("news.yesterday") }
         return day.formatted(.dateTime.month().day().weekday(.wide))
     }
 
@@ -127,53 +190,73 @@ struct NewsListView: View {
     }
 }
 
-// MARK: - 新闻行
+// MARK: - 新闻行（TradingView 新闻流：时间列左 + 来源右 + hover 箭头）
 
 struct NewsRow: View {
     let item: NewsItem
+    @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                if let tag = item.aiTag {
-                    TagChip(text: tag.impact == .positive ? "利好" : (tag.impact == .negative ? "利空" : "中性"),
-                            color: tag.impact == .positive ? .red : (tag.impact == .negative ? .green : .gray))
-                    TagChip(text: tag.stance == .bullish ? "看多" : (tag.stance == .bearish ? "看空" : "中性"),
-                            color: tag.stance == .bullish ? .red : (tag.stance == .bearish ? .green : .gray))
+        HStack(spacing: 10) {
+            // hover 箭头（非 hover 占位保持列对齐）
+            TectonicIconView(icon: .chevronRight, size: 9, color: DS.accent)
+                .opacity(hovering ? 1 : 0)
+                .frame(width: 10)
+
+            // 时间列（固定宽）
+            Text(item.publishedAt.formatted(.relative(presentation: .named)))
+                .font(.system(size: DS.metaSize, weight: .medium))
+                .foregroundStyle(hovering ? DS.accent : DS.textTertiary)
+                .frame(width: 62, alignment: .leading)
+
+            // 标题 + 摘要
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(item.title)
+                        .font(.system(size: DS.listTitleSize, weight: .medium))
+                        .foregroundStyle(DS.textPrimary)
+                        .lineLimit(2)
+                    if let tag = item.aiTag {
+                        impactChip(tag)
+                    }
                 }
-                Text(item.source)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(item.publishedAt.formatted(.relative(presentation: .named)))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !item.summary.isEmpty {
+                    Text(item.summary)
+                        .font(.system(size: DS.listBodySize))
+                        .foregroundStyle(DS.textSecondary)
+                        .lineLimit(1)
+                }
             }
-            Text(item.title)
-                .font(.body.weight(.medium))
-                .lineLimit(3)
-            if !item.summary.isEmpty {
-                Text(item.summary)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // 来源标签（右对齐）
+            Text(item.source)
+                .font(.system(size: DS.metaSize, weight: .medium))
+                .foregroundStyle(DS.textSecondary)
+                .lineLimit(1)
+                .frame(maxWidth: 120, alignment: .trailing)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .contentShape(Rectangle())
+        .background(
+            RoundedRectangle(cornerRadius: DS.radiusMedium)
+                .fill(hovering ? DS.bgHover : .clear)
+        )
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
     }
-}
 
-struct TagChip: View {
-    let text: String
-    let color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(color.opacity(0.15)))
-            .foregroundStyle(color)
+    @ViewBuilder
+    private func impactChip(_ tag: NewsTag) -> some View {
+        let (text, color): (String, Color) = switch (tag.impact, tag.stance) {
+        case (.positive, _): (L10n.l("news.tagBullish"), DS.up)
+        case (.negative, _): (L10n.l("news.tagBearish"), DS.down)
+        case (_, .bullish): (L10n.l("news.tagLong"), DS.up)
+        case (_, .bearish): (L10n.l("news.tagShort"), DS.down)
+        default: (L10n.l("news.tagNeutral"), DS.neutral)
+        }
+        DSChip(text: text, color: color)
     }
 }
 
@@ -184,53 +267,72 @@ struct NewsDetailView: View {
     let item: NewsItem
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 正文区（可滚动）
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 8) {
-                        Text(item.source)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(item.publishedAt.formatted(date: .abbreviated, time: .shortened))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        if let tag = item.aiTag {
-                            Text("AI 判断：\(tag.impact == .positive ? "利好" : (tag.impact == .negative ? "利空" : "中性")) / \(tag.stance == .bullish ? "看多" : (tag.stance == .bearish ? "看空" : "中性"))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                // 元信息行
+                HStack(spacing: 10) {
+                    TectonicIconView(icon: .news, size: 13, color: DS.textTertiary)
+                    Text(item.source)
+                        .font(.system(size: DS.captionSize))
+                        .foregroundStyle(DS.textSecondary)
+                    Text(item.publishedAt.formatted(date: .abbreviated, time: .shortened))
+                        .font(.system(size: DS.captionSize))
+                        .foregroundStyle(DS.textTertiary)
+                    Spacer()
+                    if let tag = item.aiTag {
+                        let (text, color): (String, Color) = switch (tag.impact, tag.stance) {
+                        case (.positive, _): (L10n.l("news.tagBullish"), DS.up)
+                        case (.negative, _): (L10n.l("news.tagBearish"), DS.down)
+                        case (_, .bullish): (L10n.l("news.tagLong"), DS.up)
+                        case (_, .bearish): (L10n.l("news.tagShort"), DS.down)
+                        default: (L10n.l("news.tagNeutral"), DS.neutral)
                         }
-                        Button {
-                            if let url = URL(string: item.url) {
-                                NSWorkspace.shared.open(url)
-                            }
-                        } label: {
-                            Label("浏览器打开", systemImage: "safari")
-                        }
-                        .controlSize(.small)
+                        DSChip(text: text, color: color)
                     }
-                    Text(item.title)
-                        .font(.title2.weight(.semibold))
-                        .textSelection(.enabled)
-                    Divider()
-                    Text(item.content ?? item.summary)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    DSIconButton(icon: .externalLink, help: L10n.l("news.openInBrowser")) {
+                        if let url = URL(string: item.url) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
                 }
-                .padding(16)
+
+                // 标题
+                Text(item.title)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(DS.textPrimary)
+                    .textSelection(.enabled)
+
+                DSDivider()
+
+                // 正文
+                Text(item.content ?? item.summary)
+                    .font(.system(size: 14))
+                    .foregroundStyle(DS.textPrimary)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineSpacing(4)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(20)
+            .frame(maxWidth: 860, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
-        .navigationTitle(L10n.l("sidebar.news"))
+        .background(DS.bgApp)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     openChat()
                 } label: {
-                    Label(L10n.l("news.aiChat"), systemImage: "brain")
+                    HStack(spacing: 4) {
+                        TectonicIconView(icon: .sparkles, size: 14, color: DS.accent)
+                        Text(L10n.l("news.aiChat"))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(DS.textPrimary)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: DS.radiusMedium).fill(DS.bgHover))
                 }
+                .buttonStyle(.plain)
                 .help(L10n.l("news.aiChat"))
             }
         }

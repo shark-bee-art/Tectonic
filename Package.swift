@@ -44,7 +44,10 @@ let package = Package(
         .executableTarget(
             name: "TectonicApp",
             dependencies: ["CoreKit"],
-            path: "Sources/TectonicApp"
+            path: "Sources/TectonicApp",
+            resources: [
+                .process("Resources/Fonts")
+            ]
         )
     ]
 )
