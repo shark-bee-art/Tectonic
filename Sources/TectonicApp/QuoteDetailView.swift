@@ -58,7 +58,7 @@ struct QuoteDetailView: View {
             DSCapsLabel(text: "\(symbol.code) · \(symbol.market.displayName)")
 
             if let quote {
-                HStack(alignment: .firstTextBaseline, spacing: DS.space3) {
+                HStack(alignment: .center, spacing: DS.space3) {
                     // 40pt Hero 大数字
                     Text(fmt(quote.price))
                         .font(.system(size: DS.heroSize, weight: .bold).monospacedDigit())
@@ -68,6 +68,8 @@ struct QuoteDetailView: View {
                     Text("\(fmtSigned(quote.change)) (\(fmtPercent(quote.changePercent)))")
                         .font(.system(size: 16, weight: .medium).monospacedDigit())
                         .foregroundStyle(DS.directionColor(quote.change))
+                    // 收藏按钮（与价格同高，稍放大）
+                    WatchlistToggle(symbol: symbol, size: 22)
                 }
                 Text("今开 \(fmt(quote.open))  最高 \(fmt(quote.high))  最低 \(fmt(quote.low))  昨收 \(fmt(quote.prevClose))")
                     .font(.system(size: DS.tickerSize, weight: .medium))
@@ -78,13 +80,9 @@ struct QuoteDetailView: View {
                     .frame(maxWidth: .infinity, minHeight: 80)
             }
 
-            HStack(spacing: DS.space3) {
-                WatchlistToggle(symbol: symbol)
-                Text(symbol.currency)
-                    .font(.system(size: DS.bodySmallSize))
-                    .foregroundStyle(DS.textTertiary)
-            }
-            .padding(.top, DS.space2)
+            Text(symbol.currency)
+                .font(.system(size: DS.bodySmallSize))
+                .foregroundStyle(DS.textTertiary)
         }
         .padding(.bottom, DS.space2)
     }
@@ -589,6 +587,7 @@ struct QuoteDetailView: View {
 struct WatchlistToggle: View {
     @EnvironmentObject var app: AppState
     let symbol: Symbol
+    var size: CGFloat = 18
 
     var body: some View {
         let inList = app.store.isInWatchlist(symbol)
@@ -604,7 +603,7 @@ struct WatchlistToggle: View {
             }
         } label: {
             TectonicIconView(icon: inList ? .starFilled : .star,
-                             size: 18,
+                             size: size,
                              color: inList ? DS.up : DS.textSecondary)
                 .padding(6)
                 .background(
