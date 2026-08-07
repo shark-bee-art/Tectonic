@@ -237,9 +237,9 @@ enum KLineAggregator {
             }
             buckets[key, default: []].append(bar)
         }
-        let sortedKeys = buckets.keys.sorted { a, b in
-            // 自然排序即可（ISO 周 / 年月 / 年份都按字典序 = 时间序）
-            a < b
+        // 按桶内最早时间排序（数值时间戳，避免 "2026-10" 字典序排在 "2026-2" 前）
+        let sortedKeys = buckets.keys.sorted {
+            (buckets[$0]?.first?.time ?? .distantFuture) < (buckets[$1]?.first?.time ?? .distantFuture)
         }
         var result: [KLineBar] = []
         for key in sortedKeys {

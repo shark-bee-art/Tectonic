@@ -34,8 +34,8 @@ struct KLineChartView: View {
             let maxP = (allPrices.max() ?? 1) * 1.002
             let priceSpan = max(maxP - minP, 0.0001)
 
-            // 成交量范围
-            let maxVol = (bars.map(\.volume).max() ?? 1) * 1.05
+            // 成交量范围（防除零：全 0 时 maxVol 兜底）
+            let maxVol = max((bars.map(\.volume).max() ?? 0), 0.0001) * 1.05
 
             // 均线
             let ma5 = movingAverage(bars, period: 5)

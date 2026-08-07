@@ -57,9 +57,6 @@ struct QuoteDetailView: View {
         .task(id: "\(symbol.id)-kline-\(klinePeriod.rawValue)") {
             await loadKLine()
         }
-        .onChange(of: klinePeriod) { _, _ in
-            Task { await loadKLine() }
-        }
     }
 
     /// 打开 AI 问询面板（系统提示含行情 + 可选联网资讯）——已迁移至底部对话框 sendChat

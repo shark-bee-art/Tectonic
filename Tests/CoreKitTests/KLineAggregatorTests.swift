@@ -46,4 +46,22 @@ final class KLineAggregatorTests: XCTestCase {
     func testAggregateEmpty() {
         XCTAssertTrue(KLineAggregator.aggregate([], to: .year).isEmpty)
     }
+
+    /// 跨月排序：10 月必须排在 2 月之后（字典序会错排，回归保护）
+    func testAggregateMonthOrdering() {
+        let cal = Calendar(identifier: .gregorian)
+        var c1 = DateComponents(); c1.year = 2026; c1.month = 2; c1.day = 3
+        var c2 = DateComponents(); c2.year = 2026; c2.month = 10; c2.day = 20
+        var c3 = DateComponents(); c3.year = 2026; c3.month = 1; c3.day = 5
+        let bars = [
+            KLineBar(symbolId: "t", period: .day, time: cal.date(from: c1)!, open: 1, high: 2, low: 1, close: 1.5, volume: 10),
+            KLineBar(symbolId: "t", period: .day, time: cal.date(from: c2)!, open: 2, high: 3, low: 2, close: 2.5, volume: 10),
+            KLineBar(symbolId: "t", period: .day, time: cal.date(from: c3)!, open: 0.5, high: 1, low: 0.5, close: 0.8, volume: 10),
+        ]
+        let months = KLineAggregator.aggregate(bars, to: .month)
+        let desc = months.map { "\($0.time.timeIntervalSince1970)-O\($0.open)" }.joined(separator: " | ")
+        XCTAssertEqual(months.count, 3, "聚合结果: \(desc)")
+        let monthNums = months.map { cal.component(.month, from: $0.time) }
+        XCTAssertEqual(monthNums, [1, 2, 10])  // 时间序而非字典序
+    }
 }
