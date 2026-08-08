@@ -217,45 +217,50 @@ public final class MarketDataSourceRegistry: Sendable {
 enum KLineAggregator {
     static func aggregate(_ bars: [KLineBar], to period: KLinePeriod) -> [KLineBar] {
         guard !bars.isEmpty else { return [] }
-        // 按时间分桶：周 → ISO 周、月 → 年月、年 → 年份
         let cal = Calendar(identifier: .gregorian)
-        var buckets: [String: [KLineBar]] = [:]
-        for bar in bars {
-            let key: String
-            switch period {
-            case .week:
-                let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: bar.time)
-                key = "\\(comps.yearForWeekOfYear ?? 0)-W\\(comps.weekOfYear ?? 0)"
-            case .month:
-                let comps = cal.dateComponents([.year, .month], from: bar.time)
-                key = "\\(comps.year ?? 0)-\\(comps.month ?? 0)"
-            case .year:
-                let comps = cal.dateComponents([.year], from: bar.time)
-                key = "\\(comps.year ?? 0)"
-            default:
-                key = String(bar.time.timeIntervalSince1970)
-            }
-            buckets[key, default: []].append(bar)
-        }
-        // 按桶内最早时间排序（数值时间戳，避免 "2026-10" 字典序排在 "2026-2" 前）
-        let sortedKeys = buckets.keys.sorted {
-            (buckets[$0]?.first?.time ?? .distantFuture) < (buckets[$1]?.first?.time ?? .distantFuture)
-        }
+        // 按时间升序，流式分桶（同一桶内合并 OHLCV）
+        let sorted = bars.sorted { $0.time < $1.time }
         var result: [KLineBar] = []
-        for key in sortedKeys {
-            let group = buckets[key]!.sorted { $0.time < $1.time }
-            guard let first = group.first, let last = group.last else { continue }
+        var currentKey: String? = nil
+        var current: [KLineBar] = []
+
+        func flush() {
+            guard !current.isEmpty, let first = current.first, let last = current.last else { return }
             result.append(KLineBar(
                 symbolId: first.symbolId,
                 period: period,
                 time: first.time,
                 open: first.open,
-                high: group.map(\.high).max() ?? first.high,
-                low: group.map(\.low).min() ?? first.low,
+                high: current.map(\.high).max() ?? first.high,
+                low: current.map(\.low).min() ?? first.low,
                 close: last.close,
-                volume: group.reduce(0) { $0 + $1.volume }
+                volume: current.reduce(0) { $0 + $1.volume }
             ))
+            current = []
         }
+
+        for bar in sorted {
+            let key: String
+            switch period {
+            case .week:
+                let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: bar.time)
+                key = "\(comps.yearForWeekOfYear ?? 0)-W\(comps.weekOfYear ?? 0)"
+            case .month:
+                let comps = cal.dateComponents([.year, .month], from: bar.time)
+                key = "\(comps.year ?? 0)-\(comps.month ?? 0)"
+            case .year:
+                let comps = cal.dateComponents([.year], from: bar.time)
+                key = "\(comps.year ?? 0)"
+            default:
+                key = String(bar.time.timeIntervalSince1970)
+            }
+            if key != currentKey {
+                flush()
+                currentKey = key
+            }
+            current.append(bar)
+        }
+        flush()
         return result
     }
 }

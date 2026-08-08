@@ -59,8 +59,7 @@ final class KLineAggregatorTests: XCTestCase {
             KLineBar(symbolId: "t", period: .day, time: cal.date(from: c3)!, open: 0.5, high: 1, low: 0.5, close: 0.8, volume: 10),
         ]
         let months = KLineAggregator.aggregate(bars, to: .month)
-        let desc = months.map { "\($0.time.timeIntervalSince1970)-O\($0.open)" }.joined(separator: " | ")
-        XCTAssertEqual(months.count, 3, "聚合结果: \(desc)")
+        XCTAssertEqual(months.count, 3, "聚合应为 3 桶")
         let monthNums = months.map { cal.component(.month, from: $0.time) }
         XCTAssertEqual(monthNums, [1, 2, 10])  // 时间序而非字典序
     }
