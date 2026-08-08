@@ -27,6 +27,12 @@ final class AppState: ObservableObject {
     @Published var chatPanel: ChatPanelContext?
     /// 顶部搜索框词（全局过滤当前列表）
     @Published var searchText = ""
+    /// 顶部搜索框：当前查询词（用于全局结果下拉）
+    @Published var searchQuery = ""
+    /// 顶部搜索框：搜索结果（全局下拉展示）
+    @Published var searchResults: [Symbol] = []
+    /// 顶部搜索框：是否聚焦（显示下拉）
+    @Published var isSearchFocused = false
     /// ⌘K 命令面板可见性
     @Published var showCommandPalette = false
 

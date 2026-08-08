@@ -8,14 +8,19 @@ struct ContentView: View {
     @EnvironmentObject var app: AppState
 
     var body: some View {
-        VStack(spacing: 0) {
-            TopBar()
-            DSDivider()
-            // 主区域：详情优先（导航栈 push），否则当前 tab 列表
-            mainArea
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            VStack(spacing: 0) {
+                TopBar()
+                DSDivider()
+                // 主区域：详情优先（导航栈 push），否则当前 tab 列表
+                mainArea
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(DS.bgApp)
+
+            // 全局搜索下拉（最上层，不被任何内容遮挡）
+            SearchResultsOverlay()
         }
-        .background(DS.bgApp)
         .onAppear { app.onAppear() }
     }
 

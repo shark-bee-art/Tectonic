@@ -145,56 +145,98 @@ struct TopBar: View {
 
 struct SymbolSearchField: View {
     @EnvironmentObject var app: AppState
-    @State private var query = ""
-    @State private var results: [Symbol] = []
-    @State private var isSearching = false
     @State private var addedIDs: Set<String> = []
     @FocusState private var focused: Bool
 
     var body: some View {
-        ZStack(alignment: .top) {
-            // 输入框
-            HStack(spacing: 6) {
-                TectonicIconView(icon: .search, size: 14,
-                                 color: focused ? DS.textPrimary : DS.textTertiary)
-                TextField(L10n.l("add.searchHint"), text: $query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .focused($focused)
-                    .onSubmit { search() }
-                    .onChange(of: query) { _, newValue in
-                        if newValue.trimmingCharacters(in: .whitespacesAndNewlines).count >= 1 {
-                            search()
-                        } else {
-                            results = []
-                        }
+        HStack(spacing: 6) {
+            TectonicIconView(icon: .search, size: 14,
+                             color: focused ? DS.textPrimary : DS.textTertiary)
+            TextField(L10n.l("add.searchHint"), text: $app.searchQuery)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .focused($focused)
+                .onSubmit { search() }
+                .onChange(of: focused) { _, newValue in
+                    app.isSearchFocused = newValue
+                    if !newValue {
+                        app.searchResults = []
                     }
-                if !query.isEmpty {
-                    Button {
-                        query = ""
-                        results = []
-                    } label: {
-                        TectonicIconView(icon: .x, size: 12, color: DS.textTertiary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("清除")
                 }
+                .onChange(of: app.searchQuery) { _, newValue in
+                    if newValue.trimmingCharacters(in: .whitespacesAndNewlines).count >= 1 {
+                        search()
+                    } else {
+                        app.searchResults = []
+                    }
+                }
+            if !app.searchQuery.isEmpty {
+                Button {
+                    app.searchQuery = ""
+                    app.searchResults = []
+                } label: {
+                    TectonicIconView(icon: .x, size: 12, color: DS.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .help("清除")
             }
-            .padding(.horizontal, 10)
-            .frame(height: 36)
-            .background(
-                RoundedRectangle(cornerRadius: DS.radiusCard)
-                    .fill(focused ? DS.bgPanel : DS.bgSurface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DS.radiusCard)
-                            .stroke(focused ? DS.textPrimary : DS.border, lineWidth: 1)
-                    )
-            )
+        }
+        .padding(.horizontal, 10)
+        .frame(width: 300, height: 36)
+        .background(
+            RoundedRectangle(cornerRadius: DS.radiusCard)
+                .fill(focused ? DS.bgPanel : DS.bgSurface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: DS.radiusCard)
+                        .stroke(focused ? DS.textPrimary : DS.border, lineWidth: 1)
+                )
+        )
+    }
 
-            // 搜索结果下拉（overlay 悬浮，不占布局空间，避免与下方内容重叠）
-            if focused && !results.isEmpty {
+    private func search() {
+        let q = app.searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        Task {
+            let found = await app.store.search(query: q, market: nil)
+            app.searchResults = found.isEmpty ? (exactSymbol(q).map { [$0] } ?? []) : found
+        }
+    }
+
+    private func exactSymbol(_ q: String) -> Symbol? {
+        let up = q.uppercased()
+        if up.allSatisfy(\.isNumber), up.count == 6 {
+            return Symbol(market: .cn, code: up, name: up)
+        }
+        if up.hasSuffix(".HK") || (up.allSatisfy(\.isNumber) && up.count == 5) {
+            let code = up.replacingOccurrences(of: ".HK", with: "")
+            return Symbol(market: .hk, code: code, name: code)
+        }
+        if up.hasSuffix("USDT") || up.hasSuffix("USDC") {
+            return Symbol(market: .crypto, code: up, name: up)
+        }
+        if up.allSatisfy(\.isNumber), up.count == 6, up.hasPrefix("0") || up.hasPrefix("1") {
+            return Symbol(market: .fund, code: up, name: up)
+        }
+        return nil
+    }
+}
+
+// MARK: - 全局搜索下拉（浮在 ContentView 最上层，不被任何内容遮挡）
+
+struct SearchResultsOverlay: View {
+    @EnvironmentObject var app: AppState
+    @State private var addedIDs: Set<String> = []
+
+    var body: some View {
+        // 对齐右上（搜索框位置：右侧 410 区域内的左上 ≈ 窗口宽 - 430）
+        VStack(spacing: 0) {
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .overlay(alignment: .topTrailing) {
+            if app.isSearchFocused && !app.searchResults.isEmpty {
                 VStack(spacing: 1) {
-                    ForEach(results.prefix(6)) { symbol in
+                    ForEach(app.searchResults.prefix(6)) { symbol in
                         searchResultRow(symbol)
                     }
                 }
@@ -209,12 +251,12 @@ struct SymbolSearchField: View {
                                 .stroke(DS.border, lineWidth: 1)
                         )
                 )
-                .offset(y: 40)  // 悬浮在输入框正下方
-                .zIndex(50)
+                .padding(.trailing, 44)   // 对齐搜索框右缘（窗口右缘 → 10 padding + 刷新按钮 ~28 + 间距 6）
+                .padding(.top, 50)        // 顶部栏 52 高 + 间距
                 .transition(.opacity)
+                .zIndex(100)
             }
         }
-        .frame(width: 300)
     }
 
     private func searchResultRow(_ symbol: Symbol) -> some View {
@@ -255,46 +297,15 @@ struct SymbolSearchField: View {
         .buttonStyle(.plain)
     }
 
-    private func search() {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !q.isEmpty else { return }
-        isSearching = true
-        Task {
-            defer { isSearching = false }
-            results = await app.store.search(query: q, market: nil)
-            if results.isEmpty, let symbol = exactSymbol(q) {
-                results = [symbol]
-            }
-        }
-    }
-
-    private func exactSymbol(_ q: String) -> Symbol? {
-        let up = q.uppercased()
-        if up.allSatisfy(\.isNumber), up.count == 6 {
-            return Symbol(market: .cn, code: up, name: up)
-        }
-        if up.hasSuffix(".HK") || (up.allSatisfy(\.isNumber) && up.count == 5) {
-            let code = up.replacingOccurrences(of: ".HK", with: "")
-            return Symbol(market: .hk, code: code, name: code)
-        }
-        if up.hasSuffix("USDT") || up.hasSuffix("USDC") {
-            return Symbol(market: .crypto, code: up, name: up)
-        }
-        if up.allSatisfy(\.isNumber), up.count == 6, up.hasPrefix("0") || up.hasPrefix("1") {
-            return Symbol(market: .fund, code: up, name: up)
-        }
-        return nil
-    }
-
     private func add(_ symbol: Symbol) {
         do {
             let added = try app.store.addToWatchlist(symbol)
             if added {
                 addedIDs.insert(symbol.id)
                 // 添加成功：清空输入与结果，收起下拉，恢复原样
-                query = ""
-                results = []
-                focused = false
+                app.searchQuery = ""
+                app.searchResults = []
+                app.isSearchFocused = false
                 // 反馈 2 秒后移除标记
                 Task {
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
